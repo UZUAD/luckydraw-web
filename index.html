@@ -2,580 +2,177 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>LuckyDraw (웹 버전)</title>
+  <title>럭키드로우</title>
 
-  <!-- 엑셀 처리용 SheetJS (브라우저용) CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
     body {
       margin: 0;
       height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #1d7dbb 0%, #1b1b52 100%);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, #2f80ed, #0b1525);
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .app {
-      width: 100%;
-      max-width: 1200px;
-      height: 90vh;
-      display: grid;
-      grid-template-columns: 3fr 2fr;
-      gap: 32px;
-      padding: 32px;
-    }
-
-    .roulette-card,
-    .panel {
-      background: rgba(0, 0, 0, 0.25);
-      border-radius: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-      padding: 24px 32px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .roulette-card {
-      align-items: center;
-      justify-content: center;
-      position: relative;
       overflow: hidden;
+      color: white;
     }
 
-    .roulette-title {
-      position: absolute;
-      top: 20px;
-      left: 32px;
-      font-size: 18px;
-      font-weight: 600;
-      opacity: 0.8;
-    }
-
-    .roulette-numbers {
+    .container {
+      text-align: center;
       display: flex;
-      gap: 16px;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      margin-bottom: 40px;
     }
 
-    .digit {
-      width: 80px;
-      height: 120px;
-      border-radius: 18px;
-      background: linear-gradient(145deg, #151c2b, #222c40);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .title {
       font-size: 64px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      box-shadow: 0 12px 25px rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-weight: 800;
+      margin-bottom: 40px;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.25);
     }
 
-    .digit.spin {
-      animation: spin 0.2s linear infinite;
+    .digits-wrapper {
+      background: rgba(255,255,255,0.09);
+      padding: 48px 70px;
+      border-radius: 42px;
+      backdrop-filter: blur(25px);
+      margin-bottom: 70px;
+      display: inline-flex;
+      gap: 30px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.28);
     }
 
-    @keyframes spin {
-      0% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
-      100% { transform: translateY(0); }
-    }
-
-    .roulette-actions {
+    .digit-box {
+      width: 115px;
+      height: 160px;
+      background: #0f1422;
+      border-radius: 24px;
       display: flex;
-      flex-direction: column;
+      justify-content: center;
       align-items: center;
-      gap: 12px;
+      font-size: 86px;
+      font-weight: 800;
+      color: #00f6ff;
+      text-shadow:
+          0 0 12px rgba(0,255,255,0.6),
+          0 0 22px rgba(0,255,255,0.45),
+          0 0 36px rgba(0,255,255,0.25);
+      box-shadow:
+          inset 0 0 18px rgba(0,255,255,0.12),
+          inset 0 0 10px rgba(0,255,255,0.1),
+          0 12px 28px rgba(0,0,0,0.45);
     }
 
-    .primary-btn {
-      padding: 14px 32px;
-      border-radius: 999px;
-      border: none;
-      background: linear-gradient(135deg, #ffb33a, #ff6b3d);
-      color: #1a1410;
-      font-size: 18px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
-      transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.08s ease;
+    .spin {
+      animation: flicker 0.09s infinite;
     }
 
-    .primary-btn:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.05);
-      box-shadow: 0 16px 35px rgba(0, 0, 0, 0.6);
-    }
-
-    .primary-btn:active {
-      transform: translateY(1px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
-    }
-
-    .hint {
-      font-size: 13px;
-      opacity: 0.7;
-    }
-
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 12px;
-    }
-
-    .panel-title {
-      font-size: 18px;
-      font-weight: 600;
-    }
-
-    .badge {
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 11px;
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      opacity: 0.9;
-    }
-
-    .panel-section {
-      margin-top: 18px;
-      padding-top: 14px;
-      border-top: 1px solid rgba(255, 255, 255, 0.12);
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-bottom: 14px;
-    }
-
-    label {
-      font-size: 13px;
-      opacity: 0.9;
-    }
-
-    input[type="file"],
-    input[type="number"] {
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(0, 0, 0, 0.35);
-      color: #fff;
-      font-size: 14px;
-    }
-
-    input[type="number"] {
-      width: 120px;
-    }
-
-    .btn-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 4px;
+    @keyframes flicker {
+      0% { transform: translateY(0); opacity: 1; }
+      50% { transform: translateY(-4px); opacity: 0.83; }
+      100% { transform: translateY(0); opacity: 1; }
     }
 
     .btn {
-      padding: 8px 14px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      background: rgba(0, 0, 0, 0.35);
-      color: #fff;
-      font-size: 13px;
+      padding: 20px 52px;
+      font-size: 22px;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      background: #3fa9f5;
+      color: white;
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
+      display: block;
+      margin: 0 auto;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      transition: 0.15s;
     }
 
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: default;
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 35px rgba(0,0,0,0.30);
     }
 
-    .stat {
-      font-size: 13px;
-      opacity: 0.9;
-      margin-top: 2px;
-    }
-
-    .winner-list {
-      margin-top: 8px;
-      max-height: 200px;
-      overflow: auto;
-      padding-right: 4px;
-      font-size: 14px;
-    }
-
-    .winner-list ul {
-      list-style: none;
-      padding-left: 0;
-      margin: 0;
-    }
-
-    .winner-list li {
-      padding: 4px 0;
-      border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .winner-name {
-      font-weight: 500;
-    }
-
-    .winner-index {
-      opacity: 0.7;
-      font-size: 12px;
-    }
-
-    .danger {
-      color: #ffb3b3;
-      font-size: 12px;
-      margin-top: 4px;
-    }
-
-    @media (max-width: 920px) {
-      .app {
-        grid-template-columns: 1fr;
-        height: auto;
-        max-width: 700px;
-      }
+    .btn:active {
+      transform: translateY(2px);
     }
   </style>
 </head>
+
 <body>
-<div class="app">
-  <!-- 룰렛 영역 -->
-  <section class="roulette-card">
-    <div class="roulette-title">LuckyDraw 룰렛</div>
+<div class="container">
+  <div class="title">경품이벤트</div>
 
-    <div class="roulette-numbers">
-      <div class="digit" id="d1">0</div>
-      <div class="digit" id="d2">0</div>
-      <div class="digit" id="d3">0</div>
-      <div class="digit" id="d4">0</div>
-      <div class="digit" id="d5">0</div>
-    </div>
+  <div class="digits-wrapper">
+    <div class="digit-box" id="d1">0</div>
+    <div class="digit-box" id="d2">0</div>
+    <div class="digit-box" id="d3">0</div>
+    <div class="digit-box" id="d4">0</div>
+    <div class="digit-box" id="d5">0</div>
+  </div>
 
-    <div class="roulette-actions">
-      <button class="primary-btn" id="rouletteBtn">
-        룰렛 시작 / 정지 (Space)
-      </button>
-      <div class="hint">
-        룰렛은 연출용이고, 실제 당첨자는 오른쪽 패널에서
-        <strong>엑셀 기반 랜덤 추첨</strong>으로 정해집니다.
-      </div>
-    </div>
-  </section>
-
-  <!-- 오른쪽 패널: 명단/추첨 -->
-  <section class="panel">
-    <div class="panel-header">
-      <div class="panel-title">추첨 설정 & 명단 관리</div>
-      <span class="badge">100% 브라우저 내 처리 · 서버 비용 0원</span>
-    </div>
-
-    <!-- 명단 업로드 -->
-    <div class="panel-section">
-      <div class="field">
-        <label for="fileInput">참여자 명단 엑셀 업로드 (.xlsx)</label>
-        <input type="file" id="fileInput" accept=".xlsx,.xls" />
-        <div class="stat">
-          현재 참여자 수:
-          <strong><span id="participantCount">0</span>명</strong>
-        </div>
-        <div class="hint">
-          첫 번째 시트의 <code>이름</code> / <code>성명</code> / <code>name</code> 컬럼을 자동으로 인식합니다.
-        </div>
-        <div class="danger" id="uploadError" style="display:none;"></div>
-      </div>
-    </div>
-
-    <!-- 추첨 설정 -->
-    <div class="panel-section">
-      <div class="field">
-        <label for="winnerCount">당첨자 수</label>
-        <input type="number" id="winnerCount" min="1" value="1" />
-      </div>
-      <div class="btn-row">
-        <button class="btn" id="drawBtn">랜덤 추첨</button>
-        <button class="btn" id="downloadBtn" disabled>당첨자 엑셀 다운로드</button>
-      </div>
-      <div class="stat">
-        마지막 추첨 시각:
-        <span id="lastDrawTime">-</span>
-      </div>
-    </div>
-
-    <!-- 당첨자 리스트 -->
-    <div class="panel-section">
-      <div class="field">
-        <label>당첨자 명단</label>
-        <div class="winner-list" id="winnerList">
-          <span style="opacity:0.7;">아직 추첨 전입니다.</span>
-        </div>
-      </div>
-    </div>
-  </section>
+  <button class="btn" id="startBtn">추첨하기</button>
 </div>
 
+
 <script>
-  // =========================
-  // 룰렛(5자리 숫자) 로직
-  // =========================
-  const digitEls = [
+  const digits = [
     document.getElementById("d1"),
     document.getElementById("d2"),
     document.getElementById("d3"),
     document.getElementById("d4"),
-    document.getElementById("d5"),
+    document.getElementById("d5")
   ];
+  const btn = document.getElementById("startBtn");
 
-  let rouletteInterval = null;
-  let rouletteRunning = false;
-
-  function startRoulette() {
-    if (rouletteRunning) return;
-    rouletteRunning = true;
-
-    digitEls.forEach(el => el.classList.add("spin"));
-
-    rouletteInterval = setInterval(() => {
-      digitEls.forEach(el => {
-        el.innerText = Math.floor(Math.random() * 10);
-      });
-    }, 60);
+  function randomDigit() {
+    return Math.floor(Math.random() * 10);
   }
 
-  function stopRoulette() {
-    if (!rouletteRunning) return;
-    clearInterval(rouletteInterval);
-    rouletteRunning = false;
-
-    digitEls.forEach(el => el.classList.remove("spin"));
-
-    // 멈출 때 한 번 더 최종 숫자 확정
-    digitEls.forEach(el => {
-      el.innerText = Math.floor(Math.random() * 10);
-    });
-  }
-
-  document.getElementById("rouletteBtn").addEventListener("click", () => {
-    if (rouletteRunning) stopRoulette();
-    else startRoulette();
-  });
-
-  document.addEventListener("keyup", (e) => {
-    if (e.code === "Space") {
-      if (rouletteRunning) stopRoulette();
-      else startRoulette();
-    }
-  });
-
-  // =========================
-  // 엑셀 업로드 + 추첨 로직
-  // =========================
-  let participants = []; // ["김철수", "이영희", ...]
-  let winners = [];
-
-  const fileInput = document.getElementById("fileInput");
-  const participantCountEl = document.getElementById("participantCount");
-  const uploadErrorEl = document.getElementById("uploadError");
-  const winnerListEl = document.getElementById("winnerList");
-  const lastDrawTimeEl = document.getElementById("lastDrawTime");
-  const winnerCountInput = document.getElementById("winnerCount");
-  const drawBtn = document.getElementById("drawBtn");
-  const downloadBtn = document.getElementById("downloadBtn");
-
-  fileInput.addEventListener("change", handleFileUpload);
-  drawBtn.addEventListener("click", drawWinners);
-  downloadBtn.addEventListener("click", downloadWinnersExcel);
-
-  function handleFileUpload(e) {
-    const file = e.target.files[0];
-    uploadErrorEl.style.display = "none";
-    uploadErrorEl.innerText = "";
-
-    if (!file) {
-      participants = [];
-      participantCountEl.innerText = "0";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function (evt) {
-      try {
-        const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-
-        const firstSheetName = workbook.SheetNames[0];
-        const ws = workbook.Sheets[firstSheetName];
-
-        // header:1 → 2차원 배열로 읽기 (첫 행: 헤더)
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-        if (!rows || rows.length === 0) {
-          throw new Error("빈 시트입니다.");
-        }
-
-        const headerRow = rows[0];
-        if (!headerRow || headerRow.length === 0) {
-          throw new Error("헤더 행이 없습니다.");
-        }
-
-        // 이름 컬럼 인덱스 찾기
-        let nameColIndex = 0;
-        const nameKeywords = ["이름", "성명", "name", "Name", "NAME"];
-        for (let i = 0; i < headerRow.length; i++) {
-          const cell = String(headerRow[i] || "").trim();
-          if (nameKeywords.some((kw) => cell.includes(kw))) {
-            nameColIndex = i;
-            break;
-          }
-        }
-
-        // 데이터 행 파싱
-        const parsedNames = [];
-        for (let r = 1; r < rows.length; r++) {
-          const row = rows[r];
-          if (!row || row.length === 0) continue;
-          const rawName = row[nameColIndex];
-          const name = String(rawName || "").trim();
-          if (name) {
-            parsedNames.push(name);
-          }
-        }
-
-        if (parsedNames.length === 0) {
-          throw new Error("이름을 찾지 못했습니다. '이름' 또는 'name' 컬럼이 있는지 확인해주세요.");
-        }
-
-        participants = parsedNames;
-        participantCountEl.innerText = String(participants.length);
-
-        // 명단이 바뀌면 당첨자 초기화
-        winners = [];
-        renderWinners();
-
-      } catch (err) {
-        participants = [];
-        participantCountEl.innerText = "0";
-        uploadErrorEl.style.display = "block";
-        uploadErrorEl.innerText = "엑셀 파싱 중 오류: " + err.message;
-      }
+  function playConfetti() {
+    const defaults = {
+      particleCount: 40,
+      spread: 70,
+      startVelocity: 26,
+      gravity: 0.85,
+      ticks: 160
     };
-
-    reader.readAsArrayBuffer(file);
+    confetti({ ...defaults, origin: { x: 0.2, y: 0.15 } });
+    confetti({ ...defaults, origin: { x: 0.5, y: 0.15 } });
+    confetti({ ...defaults, origin: { x: 0.8, y: 0.15 } });
   }
 
-  function drawWinners() {
-    if (participants.length === 0) {
-      alert("먼저 참여자 명단 엑셀을 업로드해주세요.");
-      return;
-    }
+  function startDraw() {
+    btn.disabled = true;
 
-    const count = parseInt(winnerCountInput.value, 10);
-    if (isNaN(count) || count <= 0) {
-      alert("당첨자 수를 1 이상으로 입력해주세요.");
-      return;
-    }
+    digits.forEach(d => d.classList.add("spin"));
+    const spinInterval = setInterval(() => {
+      digits.forEach(d => d.textContent = randomDigit());
+    }, 80);
 
-    const drawCount = Math.min(count, participants.length);
-
-    // 깊은 복사 후 Fisher-Yates 셔플
-    const shuffled = [...participants];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    winners = shuffled.slice(0, drawCount);
-    renderWinners();
-    updateLastDrawTime();
+    setTimeout(() => {
+      clearInterval(spinInterval);
+      digits.forEach(d => {
+        d.classList.remove("spin");
+        d.textContent = randomDigit();
+      });
+      setTimeout(() => playConfetti(), 300);
+      btn.disabled = false;
+    }, 2000);
   }
 
-  function renderWinners() {
-    winnerListEl.innerHTML = "";
+  btn.addEventListener("click", startDraw);
 
-    if (!winners || winners.length === 0) {
-      winnerListEl.innerHTML = '<span style="opacity:0.7;">아직 추첨 전입니다.</span>';
-      downloadBtn.disabled = true;
-      return;
+  // 🎉 Enter 키로 실행
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      startDraw();
     }
-
-    const ul = document.createElement("ul");
-    winners.forEach((name, idx) => {
-      const li = document.createElement("li");
-
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "winner-name";
-      nameSpan.innerText = name;
-
-      const idxSpan = document.createElement("span");
-      idxSpan.className = "winner-index";
-      idxSpan.innerText = (idx + 1) + "번 당첨";
-
-      li.appendChild(nameSpan);
-      li.appendChild(idxSpan);
-      ul.appendChild(li);
-    });
-
-    winnerListEl.appendChild(ul);
-    downloadBtn.disabled = false;
-  }
-
-  function updateLastDrawTime() {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const MM = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    const hh = String(now.getHours()).padStart(2, "0");
-    const mm = String(now.getMinutes()).padStart(2, "0");
-    const ss = String(now.getSeconds()).padStart(2, "0");
-    lastDrawTimeEl.innerText = `${yyyy}-${MM}-${dd} ${hh}:${mm}:${ss}`;
-  }
-
-  function downloadWinnersExcel() {
-    if (!winners || winners.length === 0) {
-      alert("당첨자 명단이 없습니다.");
-      return;
-    }
-
-    const data = [["번호", "이름"]];
-    winners.forEach((name, idx) => {
-      data.push([idx + 1, name]);
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Winners");
-
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([wbout], { type: "application/octet-stream" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "winners.xlsx";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
+  });
 </script>
+
 </body>
 </html>
