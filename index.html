@@ -66,15 +66,6 @@
           0 12px 28px rgba(0,0,0,0.45);
     }
 
-    .spin {
-      animation: flicker 0.09s infinite;
-    }
-
-    @keyframes flicker {
-      0% { transform: translateY(0); opacity: 1; }
-      50% { transform: translateY(-4px); opacity: 0.83; }
-      100% { transform: translateY(0); opacity: 1; }
-    }
 
     .btn {
       padding: 20px 52px;
@@ -113,8 +104,6 @@
     <div class="digit-box" id="d4">0</div>
     <div class="digit-box" id="d5">0</div>
   </div>
-
-  <button class="btn" id="startBtn">추첨하기</button>
 </div>
 
 
@@ -148,7 +137,6 @@
   function startDraw() {
     btn.disabled = true;
 
-    digits.forEach(d => d.classList.add("spin"));
     const spinInterval = setInterval(() => {
       digits.forEach(d => d.textContent = randomDigit());
     }, 80);
@@ -156,7 +144,6 @@
     setTimeout(() => {
       clearInterval(spinInterval);
       digits.forEach(d => {
-        d.classList.remove("spin");
         d.textContent = randomDigit();
       });
       setTimeout(() => playConfetti(), 300);
