@@ -2,9 +2,8 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>럭키드로우</title>
+  <title>럭키드로우 — 추첨</title>
 
-  <!-- Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <style>
@@ -56,46 +55,17 @@
       font-size: 86px;
       font-weight: 800;
       color: #00f6ff;
-      text-shadow:
-          0 0 12px rgba(0,255,255,0.6),
-          0 0 22px rgba(0,255,255,0.45),
-          0 0 36px rgba(0,255,255,0.25);
-      box-shadow:
-          inset 0 0 18px rgba(0,255,255,0.12),
-          inset 0 0 10px rgba(0,255,255,0.1),
-          0 12px 28px rgba(0,0,0,0.45);
-    }
-
-
-    .btn {
-      padding: 20px 52px;
-      font-size: 22px;
-      font-weight: 700;
-      border: none;
-      border-radius: 14px;
-      background: #3fa9f5;
-      color: white;
-      cursor: pointer;
-      display: block;
-      margin: 0 auto;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-      transition: 0.15s;
-    }
-
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 15px 35px rgba(0,0,0,0.30);
-    }
-
-    .btn:active {
-      transform: translateY(2px);
+      text-shadow: 0 0 12px rgba(0,255,255,0.6), 0 0 22px rgba(0,255,255,0.45);
+      box-shadow: inset 0 0 18px rgba(0,255,255,0.12);
     }
   </style>
+
 </head>
 
 <body>
+
 <div class="container">
-  <div class="title">경품이벤트</div>
+  <div class="title">경품 이벤트</div>
 
   <div class="digits-wrapper">
     <div class="digit-box" id="d1">0</div>
@@ -106,7 +76,6 @@
   </div>
 </div>
 
-
 <script>
   const digits = [
     document.getElementById("d1"),
@@ -115,49 +84,51 @@
     document.getElementById("d4"),
     document.getElementById("d5")
   ];
-  const btn = document.getElementById("startBtn");
+
+  // 참가자 번호 불러오기
+  const numbers = JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]");
+  if (numbers.length === 0) {
+    alert("업로드된 참가자 데이터가 없습니다.\n업로드 페이지로 이동합니다.");
+    location.href = "upload.html";
+  }
 
   function randomDigit() {
     return Math.floor(Math.random() * 10);
   }
 
   function playConfetti() {
-    const defaults = {
-      particleCount: 40,
-      spread: 70,
-      startVelocity: 26,
-      gravity: 0.85,
-      ticks: 160
-    };
+    const defaults = { particleCount: 40, spread: 70, startVelocity: 26 };
     confetti({ ...defaults, origin: { x: 0.2, y: 0.15 } });
     confetti({ ...defaults, origin: { x: 0.5, y: 0.15 } });
     confetti({ ...defaults, origin: { x: 0.8, y: 0.15 } });
   }
 
-  function startDraw() {
-    btn.disabled = true;
+  let isPlaying = false;
 
-    const spinInterval = setInterval(() => {
-      digits.forEach(d => d.textContent = randomDigit());
+  function startDraw() {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    const target = numbers[Math.floor(Math.random() * numbers.length)];
+
+    const spin = setInterval(() => {
+      digits.forEach((d) => (d.textContent = randomDigit()));
     }, 80);
 
     setTimeout(() => {
-      clearInterval(spinInterval);
-      digits.forEach(d => {
-        d.textContent = randomDigit();
+      clearInterval(spin);
+
+      [...target].forEach((n, i) => {
+        digits[i].textContent = n;
       });
-      setTimeout(() => playConfetti(), 300);
-      btn.disabled = false;
+
+      setTimeout(playConfetti, 300);
+      isPlaying = false;
     }, 2000);
   }
 
-  btn.addEventListener("click", startDraw);
-
-  // 🎉 Enter 키로 실행
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      startDraw();
-    }
+    if (e.key === "Enter") startDraw();
   });
 </script>
 
