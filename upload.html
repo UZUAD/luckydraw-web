@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>엑셀 업로드 - 럭키드로우</title>
 
-  <!-- SheetJS (엑셀 파서) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
@@ -33,7 +32,7 @@
       padding: 16px;
       border-radius: 10px;
       margin-top: 20px;
-      line-height: 1.6;
+      line-height: 1.7;
       font-size: 15px;
     }
 
@@ -69,24 +68,52 @@
 
 <body>
 
-<h1>🎉 럭키드로우 참가자 업로드</h1>
+<h1>🎉 경품 추천 참가자 업로드 페이지</h1>
 
 <div class="panel">
 
   <div class="rules-box">
     <b>📌 엑셀 파일 준비 규칙</b><br><br>
-    ✔ 데이터는 <b>A1부터</b> 시작해야 합니다.<br>
-    ✔ 이름 컬럼명: <b>이름, 성함, name</b> 중 하나 가능 (선택사항)<br>
-    ✔ 참가자 번호 컬럼명:
-    <b>no, 번호, number, 연번, participantNo</b> 중 하나 사용<br>
-    ✔ 나머지 컬럼은 있어도 상관없습니다.<br>
-    ✔ 반드시 <b>번호는 숫자 형태</b>여야 합니다.<br>
+
+    ✔ <b>데이터는 반드시 A1부터 시작</b>해야 합니다.<br>
+    &nbsp;&nbsp;ㆍA1 = 컬럼명(헤더)<br>
+    &nbsp;&nbsp;ㆍA2부터 실제 데이터 입력<br><br>
+
+    ✔ <b>A열에 ‘번호 컬럼’이 반드시 있어야 함</b><br>
+    &nbsp;&nbsp;가능한 컬럼명:
+    <code>no, 번호, number, 연번, participantNo</code><br>
+    &nbsp;&nbsp;(대소문자 구분 없음)<br><br>
+
+    ✔ <b>B열 이름 컬럼은 선택사항</b><br>
+    &nbsp;&nbsp;가능한 컬럼명: <code>이름, 성함, name</code><br>
+    &nbsp;&nbsp;(이름 없어도 추첨 가능, 번호만 사용)<br><br>
+
+    ✔ <b>참가자 번호는 숫자 형태여야 함</b><br>
+    &nbsp;&nbsp;허용 범위: <code>00000 ~ 99999</code><br>
+    &nbsp;&nbsp;1~4자리여도 자동으로 5자리 변환됩니다.<br>
+    &nbsp;&nbsp;예) 7 → 00007 / 123 → 00123<br><br>
+
+    ✔ <b>추가 컬럼은 있어도 되고 없어도 됨</b><br>
+    ✔ 첫 번째 시트만 읽습니다.<br>
+    ✔ 빈 행, 문자열 번호는 자동 제외됩니다.<br><br>
+
+    <b>📌 올바른 예시</b><br>
+    <pre style="font-size:14px; background:rgba(255,255,255,0.08); padding:10px; border-radius:8px;">
+A열(필수): 번호(no)
+B열(선택): 이름(name)
+C열 이후: 자유롭게 컬럼 추가 가능
+──────────────────────────────
+번호(no) | 이름(name) | 기타정보
+7       | 김철수     | ...
+123     | 박영희     | ...
+58      | 홍길동     | ...
+    </pre>
   </div>
 
   <div class="upload-box">
-    <label>📁 엑셀 파일 선택 (.xlsx)</label><br>
+    <label>엑셀 파일 선택 (.xlsx)</label><br>
     <input type="file" id="excelFile" accept=".xlsx" />
-    <button onclick="uploadExcel()">업로드 후 추첨 페이지로 이동</button>
+    <button onclick="uploadExcel()">엑셀 업로드 후 경품 추첨 페이지로 이동</button>
   </div>
 </div>
 
@@ -113,21 +140,19 @@
         return;
       }
 
-      // 지원하는 컬럼명
       const possibleNumberKeys = ["no", "번호", "number", "연번", "participantno"];
 
-      // 번호 컬럼 찾기
+      // 첫 번째 행 기준으로 번호 컬럼 찾기
       const firstRow = json[0];
       const numberKey = Object.keys(firstRow).find(k =>
           possibleNumberKeys.includes(k.toString().toLowerCase())
       );
 
       if (!numberKey) {
-        alert("참가자 번호 컬럼(no, 번호, number 등)이 필요합니다.");
+        alert("번호 컬럼(no, 번호, number 등) 중 하나가 필요합니다.");
         return;
       }
 
-      // 번호 리스트 추출
       const numbers = json
       .map(row => row[numberKey])
       .filter(n => n !== undefined && n !== "" && !isNaN(n))
@@ -138,7 +163,6 @@
         return;
       }
 
-      // LocalStorage 저장
       localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
 
       alert(numbers.length + "명의 참가자를 저장했습니다!");
