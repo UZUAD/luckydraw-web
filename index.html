@@ -86,7 +86,7 @@
   ];
 
   // 참가자 번호 불러오기
-  const numbers = JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]");
+  let numbers = JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]");
   if (numbers.length === 0) {
     alert("업로드된 참가자 데이터가 없습니다.\n업로드 페이지로 이동합니다.");
     location.href = "upload.html";
@@ -109,7 +109,8 @@
     if (isPlaying) return;
     isPlaying = true;
 
-    const target = numbers[Math.floor(Math.random() * numbers.length)];
+    const index = Math.floor(Math.random() * numbers.length);
+    const target = numbers[index];
 
     const spin = setInterval(() => {
       digits.forEach((d) => (d.textContent = randomDigit()));
@@ -121,6 +122,9 @@
       [...target].forEach((n, i) => {
         digits[i].textContent = n;
       });
+
+      numbers.splice(index, 1);
+      localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
 
       setTimeout(playConfetti, 300);
       isPlaying = false;
