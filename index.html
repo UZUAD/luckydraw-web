@@ -5,6 +5,7 @@
   <title>럭키드로우 — 추첨</title>
 
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
     body {
@@ -13,11 +14,17 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      background: linear-gradient(135deg, #1d7dbb 0%, #1b1b52 100%);
+
+      background-image: url("./images/background.png");
+      background-size: cover;        /* 화면 꽉 채움 */
+      background-position: center bottom;   /* 중앙 기준 */
+      background-repeat: no-repeat;
+
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       overflow: hidden;
       color: white;
     }
+
 
     .container {
       text-align: center;
@@ -65,7 +72,7 @@
 <body>
 
 <div class="container">
-  <div class="title">경품 이벤트</div>
+  <div class="title">Luckydraw</div>
 
   <div class="digits-wrapper">
     <div class="digit-box" id="d1">0</div>
@@ -134,6 +141,45 @@
   document.addEventListener("keydown", (e) => {
     if (e.key === "Enter") startDraw();
   });
+</script>
+
+<script>
+  // ===== 테스트용 시뮬레이션 =====
+  async function simulateDraw(count = 500) {
+    const results = [];
+    let executed = 0;
+
+    function wait(ms) {
+      return new Promise(r => setTimeout(r, ms));
+    }
+
+    while (executed < count && numbers.length > 0) {
+      startDraw();                 // 실제 서비스 함수 호출
+      executed++;
+
+      // 애니메이션 끝날 때까지 대기 (4초 + 여유)
+      await wait(4200);
+
+      // 현재 화면 숫자 읽기
+      const picked =
+          digits.map(d => d.textContent).join("");
+
+      results.push({
+        order: executed,
+        winner: picked
+      });
+    }
+
+    console.log("시뮬레이션 결과", results);
+
+    // 엑셀 저장
+    const ws = XLSX.utils.json_to_sheet(results);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Simulation");
+    XLSX.writeFile(wb, "luckydraw_real_simulation.xlsx");
+
+    alert("시뮬레이션 완료");
+  }
 </script>
 
 </body>
