@@ -99,6 +99,17 @@
   <div class="upload-box">
     <label>엑셀 파일 선택 (.xlsx)</label><br>
     <input type="file" id="excelFile" accept=".xlsx" />
+
+    <br><br>
+
+    <label>❌ 추첨 제외 번호 (쉼표로 구분)</label><br>
+    <input
+        type="text"
+        id="excludeNumbers"
+        placeholder="예: 00012, 00105, 02345"
+        style="width:100%; padding:10px; margin-top:8px; font-size:15px;"
+    />
+
     <button onclick="uploadExcel()">엑셀 업로드 후 경품 추첨 페이지로 이동</button>
   </div>
 </div>
@@ -113,6 +124,15 @@
       alert("엑셀 파일을 선택해주세요.");
       return;
     }
+
+    const excludeInput = document.getElementById("excludeNumbers").value;
+    const excludeSet = new Set(
+        excludeInput
+        .split(",")
+        .map(v => v.trim())
+        .filter(v => v !== "")
+        .map(v => v.padStart(5, "0"))
+    );
 
     const reader = new FileReader();
     reader.onload = function(e) {
@@ -144,10 +164,11 @@
       const numbers = json
       .map(row => row[numberKey])
       .filter(n => n !== undefined && n !== "" && !isNaN(n))
-      .map(n => String(n).padStart(5, "0")); // 5자리 자동 맞춤
+      .map(n => String(n).padStart(5, "0"))
+      .filter(n => !excludeSet.has(n));
 
       if (numbers.length === 0) {
-        alert("번호 데이터가 없습니다.");
+        alert("제외 처리 후 남은 참가자가 없습니다.");
         return;
       }
 
