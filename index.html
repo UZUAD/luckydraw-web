@@ -15,9 +15,9 @@
       justify-content: center;
       align-items: center;
 
-      background-image: url("./images/background.png");
+      background-image: url("./images/13_경품추첨.png");
       background-size: cover;        /* 화면 꽉 채움 */
-      background-position: center bottom;   /* 중앙 기준 */
+      background-position: center;   /* 중앙 기준 */
       background-repeat: no-repeat;
 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -25,12 +25,13 @@
       color: white;
     }
 
-
     .container {
+      margin-top: 120px;
       text-align: center;
       display: flex;
       flex-direction: column;
       align-items: center;
+      transform: translateY(30px);
     }
 
     .title {
@@ -41,10 +42,10 @@
     }
 
     .digits-wrapper {
-      background: rgba(255,255,255,0.09);
+      background: transparent;
       padding: 48px 70px;
       border-radius: 42px;
-      backdrop-filter: blur(25px);
+      backdrop-filter: blur(14px);
       margin-bottom: 70px;
       display: inline-flex;
       gap: 30px;
@@ -72,8 +73,6 @@
 <body>
 
 <div class="container">
-  <div class="title">Lucky Draw</div>
-
   <div class="digits-wrapper">
     <div class="digit-box" id="d1">0</div>
     <div class="digit-box" id="d2">0</div>
