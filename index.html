@@ -143,7 +143,7 @@
 </script>
 
 <script>
-  // ===== 테스트용 시뮬레이션 =====
+  // 테스트용 시뮬레이션(현재 사용 x)
   async function simulateDraw(count = 500) {
     const results = [];
     let executed = 0;
@@ -156,7 +156,7 @@
       startDraw();                 // 실제 서비스 함수 호출
       executed++;
 
-      // 애니메이션 끝날 때까지 대기 (4초 + 여유)
+      // 애니메이션 끝날 때까지 대기 (4초)
       await wait(4200);
 
       // 현재 화면 숫자 읽기
