@@ -2,256 +2,620 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>럭키드로우</title>
 
-  <style>
-    /* 우주애드 기본 버튼 */
-    .btn-uzuad {
-      height: 40px;
-      padding: 0 16px;
-      border-radius: 6px;
-      background: #6413A2;
-      color: #fff;
-      font-size: 14px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: background-color 0.15s ease;
-    }
-
-    .btn-uzuad:hover {
-      background: #55108a;
-    }
-
-    .btn-uzuad:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    /* 보조 버튼 (닫기, 취소 등) */
-    .btn-uzuad-outline {
-      height: 40px;
-      padding: 0 16px;
-      border-radius: 6px;
-      background: #fff;
-      color: #374151;
-      font-size: 14px;
-      font-weight: 600;
-      border: 1px solid #D1D5DB;
-      cursor: pointer;
-    }
-
-    .btn-uzuad-outline:hover {
-      background: #F9FAFB;
-    }
-  </style>
-
-  <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
+    :root {
+      --bg: #f4f7fb;
+      --bg-accent: #eef4ff;
+      --card: rgba(255, 255, 255, 0.88);
+      --card-strong: #ffffff;
+      --line: rgba(15, 23, 42, 0.09);
+      --line-strong: rgba(15, 23, 42, 0.16);
+      --text-main: #121826;
+      --text-sub: #5d6778;
+      --brand: #1f6fff;
+      --brand-deep: #1757cb;
+      --brand-soft: rgba(31, 111, 255, 0.1);
+      --success-soft: rgba(16, 185, 129, 0.12);
+      --shadow: 0 26px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
     body {
       margin: 0;
-      padding: 32px;
-      background: #F3ECFA;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: #111827;
+      min-height: 100%;
+    }
+
+    body {
+      position: relative;
+      padding: 36px 20px 48px;
+      color: var(--text-main);
+      font-family: "SUIT Variable", "Pretendard Variable", "Noto Sans KR", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(31, 111, 255, 0.12), transparent 28%),
+        radial-gradient(circle at right top, rgba(14, 165, 233, 0.1), transparent 24%),
+        linear-gradient(180deg, #f7faff 0%, #f2f5fb 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.35) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.35) 1px, transparent 1px);
+      background-size: 100% 28px, 28px 100%;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 62%);
     }
 
     .page {
-      max-width: 720px;
+      position: relative;
+      max-width: 1080px;
+      margin: 0 auto;
     }
 
-    h1 {
-      font-size: 22px;
+    .hero {
+      margin-bottom: 20px;
+    }
+
+    .hero-card,
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .hero-card {
+      padding: 28px 32px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      color: #3d4a5f;
+      font-size: 12px;
       font-weight: 700;
-      margin-bottom: 8px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
     }
 
-    .desc {
-      color: #6B7280;
-      font-size: 14px;
-      margin-bottom: 24px;
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--brand);
+      box-shadow: 0 0 0 6px rgba(31, 111, 255, 0.1);
+    }
+
+    .hero-title,
+    .side-value {
+      margin: 0 0 12px;
+      color: var(--text-main);
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1.35;
+      letter-spacing: -0.04em;
+    }
+
+    .hero-copy {
+      margin: 0;
+      max-width: none;
+      color: var(--text-sub);
+      font-size: 16px;
+      line-height: 1.7;
+      word-break: keep-all;
+    }
+
+    .no-break {
+      white-space: nowrap;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: 20px;
     }
 
     .card {
-      background: #fff;
-      border: 1px solid #E5E7EB;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 16px;
+      padding: 26px;
     }
 
     .card-title {
+      margin: 0 0 8px;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .card-desc {
+      margin: 0 0 30px;
+      color: var(--text-sub);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .rules {
+      display: grid;
+      gap: 12px;
+    }
+
+    .rule-item {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(248, 250, 253, 0.92);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .rule-item strong {
+      display: block;
+      margin-bottom: 6px;
       font-size: 15px;
-      font-weight: 600;
-      margin-bottom: 12px;
-      color: #111827;
     }
 
-    input[type="file"] {
-      width: 100%;
-      max-width: 300px;
-      padding: 10px 12px;
+    .rule-item p {
+      margin: 0;
+      color: var(--text-sub);
       font-size: 14px;
-      border: 1px solid #D1D5DB;
-      border-radius: 8px;
+      line-height: 1.6;
     }
 
-    input[type="text"] {
-      width: 100%;
-      padding: 10px 12px;
-      font-size: 14px;
-      border: 1px solid #D1D5DB;
-      border-radius: 8px;
-    }
-
-    input::placeholder {
-      color: #9CA3AF;
-    }
-    .hint {
-      font-size: 13px;
-      color: #6B7280;
+    .rule-link {
+      display: inline-flex;
+      align-items: center;
       margin-top: 6px;
-    }
-
-    .btn {
-      width: 100%;
-      margin-top: 24px;
-      padding: 12px;
-      font-size: 15px;
+      color: #263247;
+      font-size: 14px;
       font-weight: 600;
-      color: #fff;
-      background: #4F46E5;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
 
-    .btn:hover {
-      background: #4338CA;
+    .rule-link:hover {
+      color: var(--brand-deep);
+    }
+
+    .sample-card {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(248, 250, 253, 0.92);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .sample-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .sample-card p {
+      margin: 0;
+      color: var(--text-sub);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .rule-item code {
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.06);
+      color: #253045;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #263247;
+    }
+
+    .field-head {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: nowrap;
+    }
+
+    .field-head label {
+      margin-bottom: 0;
+    }
+
+    .field-hint {
+      margin-top: 8px;
+      color: #758095;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .hidden-file {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    .file-picker {
+      min-height: 22px;
+    }
+
+    .file-badge {
+      position: relative;
+      display: inline-flex;
+      flex-shrink: 0;
+      width: 112px;
+      height: 42px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #eef4ff 0%, #dfeaff 100%);
+      border: 1px solid rgba(31, 111, 255, 0.08);
+      color: #ffffff;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.75),
+        0 8px 18px rgba(31, 111, 255, 0.08);
+      cursor: pointer;
+      user-select: none;
+      overflow: hidden;
+      transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+    }
+
+    .file-badge:hover {
+      background: linear-gradient(180deg, #f3f7ff 0%, #e4eeff 100%);
+      transform: translateY(-1px);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.8),
+        0 10px 20px rgba(31, 111, 255, 0.1);
+    }
+
+    .file-badge span {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #35507d;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .file-message {
+      display: block;
+      color: #758095;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .upload-file-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .text-input {
+      width: 100%;
+      height: 54px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #ffffff;
+      color: var(--text-main);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .text-input:focus {
+      border-color: rgba(31, 111, 255, 0.36);
+      box-shadow: 0 0 0 4px rgba(31, 111, 255, 0.09);
+    }
+
+    .quick-guide {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: #f7faff;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      color: #4f5b6e;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .chip::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #39b980;
+    }
+
+    .submit-btn {
+      width: 100%;
+      height: 58px;
+      border: none;
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--brand), #338bff);
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      cursor: pointer;
+      transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-1px);
+      background: linear-gradient(135deg, #216ef0, #237fff);
+    }
+
+    .submit-btn:active {
+      transform: translateY(0);
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--success-soft);
+      color: #287257;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 920px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 18px 14px 32px;
+      }
+
+      .hero-card,
+      .card {
+        padding: 20px;
+        border-radius: 22px;
+      }
+
+      .file-picker {
+        padding: 14px 16px;
+      }
+
+      .field-head {
+        align-items: center;
+        gap: 10px;
+      }
+
+      .file-badge {
+        min-width: 92px;
+      }
     }
   </style>
 </head>
 
 <body>
+  <div class="page">
+    <section class="hero">
+      <article class="hero-card">
+        <h2 class="hero-title">행사 추첨 운영을 위한 참가자 업로드 페이지</h2>
+        <p class="hero-copy">
+          본 화면은 럭키드로우 프로젝트에서 사용할 참가자 번호를 엑셀 파일 기준으로 등록하고, <span class="no-break">제외 대상 반영 후</span> 추첨 화면으로 전달하기 위한 사전 준비 페이지입니다.
+        </p>
+      </article>
+    </section>
 
-<h1>🎉 경품 추천 참가자 업로드 페이지</h1>
+    <section class="layout">
+      <article class="card">
+        <h2 class="card-title">업로드 규칙</h2>
+       
+        <div class="rules">
+          <div class="rule-item">
+            <strong>1. 데이터 시작 위치</strong>
+            <p>A1에는 헤더가 있고, 실제 데이터는 A2부터 시작해야 합니다.</p>
+          </div>
 
-<div class="panel">
+          <div class="rule-item">
+            <strong>2. 번호 컬럼 이름</strong>
+            <p><code>no</code> <code>번호</code> <code>number</code> <code>연번</code> <code>participantNo</code> 중 하나가 필요합니다.</p>
+          </div>
 
-  <div class="card rules-card">
-    <b>📌 엑셀 파일 준비 규칙</b><br><br>
+          <div class="rule-item">
+            <strong>3. 참가자 번호 형식</strong>
+            <p>번호는 숫자여야 하며 자동으로 5자리로 맞춰집니다.<br />예: 7 → 00007, 123 → 00123</p>
+          </div>
 
-    ✔ <b>데이터는 반드시 A1부터 시작</b>해야 합니다.<br>
-    &nbsp;&nbsp;ㆍA1 = 컬럼명(헤더)<br>
-    &nbsp;&nbsp;ㆍA2부터 실제 데이터 입력<br><br>
+          <div class="rule-item">
+            <strong>4. 이름 컬럼은 선택사항</strong>
+            <p>B열 이름 컬럼은 없어도 됩니다. 첫 번째 시트만 사용하며, 추가 컬럼도 허용됩니다.</p>
+          </div>
 
-    ✔ <b>A열에 ‘번호 컬럼’이 반드시 있어야 함</b><br>
-    가능 컬럼명:
-    <code>no, 번호, number, 연번, participantNo</code><br><br>
+          <div class="rule-item">
+            <strong>5. 첫 번째 시트 및 추가 컬럼</strong>
+            <p>A열 번호 기준으로 업로드하며, 번호 컬럼이 정상적으로 구성되어 있으면 추가 컬럼은 함께 포함되어도 무방합니다. 빈 값이나 숫자가 아닌 데이터는 업로드 과정에서 자동 제외됩니다.</p>
+          </div>
+        </div>
+      </article>
 
-    ✔ <b>B열 이름 컬럼은 선택사항</b><br>
-    가능 컬럼명: <code>이름, 성함, name</code><br><br>
+      <article class="card">
+        <h2 class="card-title">엑셀 업로드</h2>
 
-    ✔ <b>참가자 번호는 숫자 형태여야 함</b><br>
-    허용 범위: <code>00000 ~ 99999</code><br>
-    예: 7 → 00007 / 123 → 00123<br><br>
+        <div class="form-grid">
+          <div class="sample-card">
+            <strong>예시 엑셀파일</strong>
+            <p>샘플 형식을 먼저 확인해야 하면 아래 링크로 예시 파일을 열어볼 수 있습니다.</p>
+            <a class="rule-link" href="files/luckydraw_sample.xlsx" target="_blank" rel="noopener">
+              예시 엑셀파일 보기
+            </a>
+          </div>
 
-    ✔ 추가 컬럼 있어도 OK<br>
-    ✔ 첫 번째 시트만 사용<br>
-    ✔ 빈 행/문자열 번호는 자동 제외<br><br>
+          <div class="field upload-file-field">
+            <div class="field-head">
+              <label for="excelFile">업로드 파일</label>
+              <label class="file-badge" for="excelFile"><span>파일 선택</span></label>
+            </div>
+            <div class="file-picker">
+              <span class="file-message" id="fileMessage">선택된 파일이 없습니다.</span>
+            </div>
+            <input class="hidden-file" type="file" id="excelFile" accept=".xlsx" />
+          </div>
+
+          <div class="field">
+            <label for="excludeNumbers">추첨 제외 번호</label>
+            <input
+              class="text-input"
+              type="text"
+              id="excludeNumbers"
+              placeholder="예: 00012, 00105, 02345"
+            />
+            <div class="field-hint">쉼표로 구분해서 입력하면 해당 번호는 저장 단계에서 제외됩니다.</div>
+          </div>
+
+          <div class="quick-guide">
+            <div class="chip">첫 번째 시트 사용</div>
+            <div class="chip">번호 자동 5자리 보정</div>
+            <div class="chip">빈 값 자동 제외</div>
+          </div>
+
+          <button class="submit-btn" onclick="uploadExcel()">엑셀 업로드 후 럭키드로우 페이지로 이동</button>
+        </div>
+
+        <div class="footer-note">
+          업로드가 완료되면 참가자 번호가 브라우저에 저장되고, 바로 추첨 화면으로 넘어갑니다.
+        </div>
+      </article>
+    </section>
   </div>
 
-  <div class="upload-box">
-    <label>엑셀 파일 선택 (.xlsx)</label><br>
-    <input type="file" id="excelFile" accept=".xlsx" style="margin: 8px 0;"/>
-
-    <br><br>
-
-    <label>❌ 추첨 제외 번호 (쉼표로 구분)</label><br>
-    <input
-        type="text"
-        id="excludeNumbers"
-        placeholder="예: 00012, 00105, 02345"
-        style="width:100%; padding:10px; margin-top:8px; font-size:15px;"
-    />
-
-    <button class="btn-uzuad w-full" onclick="uploadExcel()" style="margin-top: 32px;">
-    엑셀 업로드 후 럭키드로우 페이지로 이동
-    </button>
-
-  </div>
-</div>
-
-
-<script>
-  function uploadExcel() {
+  <script>
     const fileInput = document.getElementById("excelFile");
-    const file = fileInput.files[0];
+    const fileMessage = document.getElementById("fileMessage");
 
-    if (!file) {
-      alert("엑셀 파일을 선택해주세요.");
-      return;
+    function updateFileMessage(message) {
+      fileMessage.textContent = message;
     }
 
-    const excludeInput = document.getElementById("excludeNumbers").value;
-    const excludeSet = new Set(
-        excludeInput
-        .split(",")
-        .map(v => v.trim())
-        .filter(v => v !== "")
-        .map(v => v.padStart(5, "0"))
-    );
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const data = e.target.result;
-      const workbook = XLSX.read(data, { type: "binary" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(sheet);
-
-      if (!json.length) {
-        alert("엑셀에 데이터가 없습니다.");
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (!file) {
+        updateFileMessage("선택된 파일이 없습니다.");
         return;
       }
 
-      // 번호 컬럼 후보
-      const possibleNumberKeys = ["no", "번호", "number", "연번", "participantno"];
+      if (!file.name.toLowerCase().endsWith(".xlsx")) {
+        fileInput.value = "";
+        updateFileMessage(".xlsx 형식만 업로드할 수 있습니다.");
+        return;
+      }
 
-      // 첫 행 기준으로 번호 컬럼 찾기
-      const firstRow = json[0];
-      const numberKey = Object.keys(firstRow).find(k =>
-          possibleNumberKeys.includes(k.toString().toLowerCase())
+      updateFileMessage(file.name);
+    });
+
+    function uploadExcel() {
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("엑셀 파일을 선택해주세요.");
+        return;
+      }
+
+      if (!file.name.toLowerCase().endsWith(".xlsx")) {
+        updateFileMessage(".xlsx 형식만 업로드할 수 있습니다.");
+        alert(".xlsx 형식의 엑셀 파일만 업로드할 수 있습니다.");
+        return;
+      }
+
+      const excludeInput = document.getElementById("excludeNumbers").value;
+      const excludeSet = new Set(
+        excludeInput
+          .split(",")
+          .map((value) => value.trim())
+          .filter((value) => value !== "")
+          .map((value) => value.padStart(5, "0"))
       );
 
-      if (!numberKey) {
-        alert("번호 컬럼(no, 번호, number, 연번…) 중 하나가 필요합니다.");
-        return;
-      }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = e.target.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
 
-      // 번호만 추출
-      const numbers = json
-      .map(row => row[numberKey])
-      .filter(n => n !== undefined && n !== "" && !isNaN(n))
-      .map(n => String(n).padStart(5, "0"))
-      .filter(n => !excludeSet.has(n));
+        if (!json.length) {
+          alert("엑셀에 데이터가 없습니다.");
+          return;
+        }
 
-      if (numbers.length === 0) {
-        alert("제외 처리 후 남은 참가자가 없습니다.");
-        return;
-      }
+        const possibleNumberKeys = ["no", "번호", "number", "연번", "participantno"];
+        const firstRow = json[0];
+        const numberKey = Object.keys(firstRow).find((key) =>
+          possibleNumberKeys.includes(key.toString().toLowerCase())
+        );
 
-      localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
+        if (!numberKey) {
+          alert("번호 컬럼(no, 번호, number, 연번…) 중 하나가 필요합니다.");
+          return;
+        }
 
-      alert(numbers.length + "명의 참가자를 저장했습니다!");
+        const numbers = json
+          .map((row) => row[numberKey])
+          .filter((value) => value !== undefined && value !== "" && !isNaN(value))
+          .map((value) => String(value).padStart(5, "0"))
+          .filter((value) => !excludeSet.has(value));
 
-      location.href = "index.html";
-    };
+        if (numbers.length === 0) {
+          alert("제외 처리 후 남은 참가자가 없습니다.");
+          return;
+        }
 
-    reader.readAsBinaryString(file);
-  }
-</script>
+        localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
+        alert(numbers.length + "명의 참가자를 저장했습니다!");
+        location.href = "index.html";
+      };
 
+      reader.readAsBinaryString(file);
+    }
+  </script>
 </body>
 </html>

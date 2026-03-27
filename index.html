@@ -2,182 +2,331 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>럭키드로우 — 추첨</title>
 
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
+    :root {
+      --text-main: #121826;
+      --box-border: rgba(107, 176, 255, 0.12);
+      --box-shadow: 0 22px 40px rgba(18, 35, 71, 0.14);
+      --digit-color: #173b7a;
+      --digit-glow: rgba(96, 167, 255, 0.18);
+      --digit-active: #116d8e;
+      --digit-reveal: #173b7a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
     body {
       margin: 0;
-      height: 100vh;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100vh;
       display: flex;
+      align-items: center;
       justify-content: center;
-      align-items: center;
-
-      background-image: url("images/lucky2.png");
-      background-size: cover;        /* 화면 꽉 채움 */
-      background-position: center;   /* 중앙 기준 */
-      background-repeat: no-repeat;
-
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       overflow: hidden;
-      color: white;
+      font-family: "SUIT Variable", "Pretendard Variable", "Noto Sans KR", sans-serif;
+      color: var(--text-main);
+      background:
+        linear-gradient(180deg, rgba(240, 247, 255, 0.12), rgba(232, 242, 255, 0.2)),
+        url("images/lucky2.png") center / cover no-repeat;
     }
 
-    .container {
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at top left, rgba(76, 153, 255, 0.14), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(125, 224, 255, 0.12), transparent 24%);
     }
 
-    .title {
-      font-size: 64px;
-      font-weight: 800;
-      margin-bottom: 40px;
-      text-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    .stage {
+      width: min(100%, 1080px);
+      padding: 32px 24px;
     }
 
     .digits-wrapper {
-      background: transparent;
-      padding: 48px 70px;
-      border-radius: 42px;
-      backdrop-filter: blur(14px);
-      margin-bottom: 70px;
-      display: inline-flex;
-      gap: 30px;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.28);
+      display: grid;
+      grid-template-columns: repeat(5, 126px);
+      justify-content: center;
+      gap: 16px;
+      align-items: center;
     }
 
     .digit-box {
-      width: 115px;
-      height: 160px;
-      background: #0f1422;
-      border-radius: 24px;
+      position: relative;
+      height: 188px;
       display: flex;
-      justify-content: center;
       align-items: center;
-      font-size: 86px;
+      justify-content: center;
+      border-radius: 28px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at top left, rgba(111, 187, 255, 0.28), transparent 42%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.72), rgba(241, 248, 255, 0.66) 48%, rgba(229, 241, 255, 0.58));
+      border: 1px solid var(--box-border);
+      box-shadow: var(--box-shadow);
+      backdrop-filter: blur(18px) saturate(135%);
+      transition:
+        transform 240ms ease,
+        border-color 240ms ease,
+        box-shadow 240ms ease,
+        background 240ms ease;
+    }
+
+    .digit-box::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.42), transparent 46%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(221, 236, 255, 0.12) 52%, rgba(255, 255, 255, 0.06));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+      pointer-events: none;
+    }
+
+    .digit-box::after {
+      content: "";
+      position: absolute;
+      width: 140%;
+      height: 72%;
+      top: -26%;
+      left: -18%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent);
+      transform: rotate(-11deg);
+      opacity: 0.46;
+      pointer-events: none;
+    }
+
+    .digit-box span {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      font-size: clamp(80px, 7.5vw, 116px);
       font-weight: 800;
-      color: #00f6ff;
-      text-shadow: 0 0 12px rgba(0,255,255,0.6), 0 0 22px rgba(0,255,255,0.45);
-      box-shadow: inset 0 0 18px rgba(0,255,255,0.12);
+      line-height: 1;
+      letter-spacing: -0.06em;
+      color: var(--digit-color);
+      text-shadow:
+        0 0 22px var(--digit-glow),
+        0 10px 24px rgba(123, 160, 214, 0.12);
+      transition:
+        transform 240ms ease,
+        color 240ms ease,
+        text-shadow 240ms ease;
+    }
+
+    body.is-drawing .digit-box {
+      border-color: rgba(126, 221, 210, 0.18);
+      background:
+        radial-gradient(circle at top left, rgba(112, 232, 214, 0.24), transparent 42%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.74), rgba(238, 251, 247, 0.7) 52%, rgba(226, 245, 240, 0.62));
+      box-shadow:
+        0 24px 46px rgba(28, 84, 120, 0.14),
+        0 0 24px rgba(112, 232, 214, 0.08);
+    }
+
+    body.is-drawing .digit-box span {
+      color: var(--digit-active);
+    }
+
+    .digit-box.reveal {
+      border-color: rgba(85, 158, 255, 0.18);
+      background:
+        radial-gradient(circle at top left, rgba(111, 187, 255, 0.24), transparent 42%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.76), rgba(241, 248, 255, 0.72) 52%, rgba(226, 239, 255, 0.62));
+      box-shadow:
+        0 24px 46px rgba(35, 86, 148, 0.12),
+        0 0 24px rgba(111, 187, 255, 0.1);
+    }
+
+    .digit-box.reveal span {
+      color: var(--digit-reveal);
+      transform: scale(1.02);
+      text-shadow:
+        0 0 24px rgba(96, 167, 255, 0.22),
+        0 10px 24px rgba(123, 160, 214, 0.12);
+    }
+
+    @media (max-width: 820px) {
+      .stage {
+        padding: 18px 16px;
+      }
+
+      .digits-wrapper {
+        grid-template-columns: repeat(5, 98px);
+        gap: 10px;
+      }
+
+      .digit-box {
+        height: 148px;
+        border-radius: 22px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .digits-wrapper {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .digit-box {
+        height: 106px;
+        border-radius: 16px;
+      }
+
+      .digit-box::before {
+        inset: 6px;
+        border-radius: 12px;
+      }
+
+      .digit-box span {
+        font-size: 54px;
+      }
     }
   </style>
-
 </head>
 
 <body>
-
-<div class="container">
-  <div class="digits-wrapper">
-    <div class="digit-box" id="d1">0</div>
-    <div class="digit-box" id="d2">0</div>
-    <div class="digit-box" id="d3">0</div>
-    <div class="digit-box" id="d4">0</div>
-    <div class="digit-box" id="d5">0</div>
+  <div class="stage">
+    <div class="digits-wrapper" aria-label="추첨 번호">
+      <div class="digit-box" id="d1"><span>0</span></div>
+      <div class="digit-box" id="d2"><span>0</span></div>
+      <div class="digit-box" id="d3"><span>0</span></div>
+      <div class="digit-box" id="d4"><span>0</span></div>
+      <div class="digit-box" id="d5"><span>0</span></div>
+    </div>
   </div>
-</div>
 
-<script>
-  const digits = [
-    document.getElementById("d1"),
-    document.getElementById("d2"),
-    document.getElementById("d3"),
-    document.getElementById("d4"),
-    document.getElementById("d5")
-  ];
+  <script>
+    const digitBoxes = [
+      document.getElementById("d1"),
+      document.getElementById("d2"),
+      document.getElementById("d3"),
+      document.getElementById("d4"),
+      document.getElementById("d5")
+    ];
 
-  // 참가자 번호 불러오기
-  let numbers = JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]");
-  if (numbers.length === 0) {
-    alert("업로드된 참가자 데이터가 없습니다.\n업로드 페이지로 이동합니다.");
-    location.href = "upload.html";
-  }
+    const digits = digitBoxes.map((box) => box.querySelector("span"));
+    let numbers = JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]");
+    if (numbers.length === 0) {
+      alert("업로드된 참가자 데이터가 없습니다.\n업로드 페이지로 이동합니다.");
+      location.href = "upload.html";
+    }
 
-  function randomDigit() {
-    return Math.floor(Math.random() * 10);
-  }
+    function randomDigit() {
+      return Math.floor(Math.random() * 10);
+    }
 
-  function playConfetti() {
-    const defaults = { particleCount: 40, spread: 70, startVelocity: 26 };
-    confetti({ ...defaults, origin: { x: 0.2, y: 0.15 } });
-    confetti({ ...defaults, origin: { x: 0.5, y: 0.15 } });
-    confetti({ ...defaults, origin: { x: 0.8, y: 0.15 } });
-  }
+    function playConfetti() {
+      if (typeof confetti !== "function") return;
 
-  let isPlaying = false;
+      const defaults = { particleCount: 44, spread: 72, startVelocity: 28 };
+      confetti({ ...defaults, origin: { x: 0.18, y: 0.14 } });
+      confetti({ ...defaults, origin: { x: 0.5, y: 0.12 } });
+      confetti({ ...defaults, origin: { x: 0.82, y: 0.14 } });
+    }
 
-  function startDraw() {
-    if (isPlaying) return;
-    isPlaying = true;
+    function clearRevealState() {
+      digitBoxes.forEach((box) => box.classList.remove("reveal"));
+    }
 
-    const index = Math.floor(Math.random() * numbers.length);
-    const target = numbers[index];
-
-    const spin = setInterval(() => {
-      digits.forEach((d) => (d.textContent = randomDigit()));
-    }, 80);
-
-    setTimeout(() => {
-      clearInterval(spin);
-
+    function revealTarget(target) {
       [...target].forEach((n, i) => {
-        digits[i].textContent = n;
-      });
-
-      numbers.splice(index, 1);
-      localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
-
-      setTimeout(playConfetti, 300);
-      isPlaying = false;
-    }, 4000);
-  }
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") startDraw();
-  });
-</script>
-
-<script>
-  // 테스트용 시뮬레이션(현재 사용 x)
-  async function simulateDraw(count = 500) {
-    const results = [];
-    let executed = 0;
-
-    function wait(ms) {
-      return new Promise(r => setTimeout(r, ms));
-    }
-
-    while (executed < count && numbers.length > 0) {
-      startDraw();                 // 실제 서비스 함수 호출
-      executed++;
-
-      // 애니메이션 끝날 때까지 대기 (4초)
-      await wait(4200);
-
-      // 현재 화면 숫자 읽기
-      const picked =
-          digits.map(d => d.textContent).join("");
-
-      results.push({
-        order: executed,
-        winner: picked
+        setTimeout(() => {
+          digits[i].textContent = n;
+          digitBoxes[i].classList.add("reveal");
+        }, i * 120);
       });
     }
 
-    console.log("시뮬레이션 결과", results);
+    let isPlaying = false;
 
-    // 엑셀 저장
-    const ws = XLSX.utils.json_to_sheet(results);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Simulation");
-    XLSX.writeFile(wb, "luckydraw_real_simulation.xlsx");
+    function startDraw() {
+      if (isPlaying || numbers.length === 0) return;
 
-    alert("시뮬레이션 완료");
-  }
-</script>
+      isPlaying = true;
+      clearRevealState();
+      document.body.classList.add("is-drawing");
 
+      const index = Math.floor(Math.random() * numbers.length);
+      const target = numbers[index];
+
+      const spin = setInterval(() => {
+        digits.forEach((digit) => {
+          digit.textContent = randomDigit();
+        });
+      }, 72);
+
+      setTimeout(() => {
+        clearInterval(spin);
+        revealTarget(target);
+
+        numbers.splice(index, 1);
+        localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
+
+        setTimeout(() => {
+          playConfetti();
+          document.body.classList.remove("is-drawing");
+          isPlaying = false;
+        }, 860);
+      }, 3600);
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") startDraw();
+    });
+  </script>
+
+  <script>
+    // 테스트용 시뮬레이션(현재 사용 x)
+    async function simulateDraw(count = 500) {
+      const results = [];
+      let executed = 0;
+
+      function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      while (executed < count && numbers.length > 0) {
+        startDraw();
+        executed++;
+
+        await wait(4700);
+
+        const picked = digits.map((digit) => digit.textContent).join("");
+        results.push({
+          order: executed,
+          winner: picked
+        });
+      }
+
+      console.log("시뮬레이션 결과", results);
+
+      const ws = XLSX.utils.json_to_sheet(results);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Simulation");
+      XLSX.writeFile(wb, "luckydraw_real_simulation.xlsx");
+
+      alert("시뮬레이션 완료");
+    }
+  </script>
 </body>
 </html>
