@@ -402,6 +402,112 @@
       line-height: 1.6;
     }
 
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(11, 18, 32, 0.42);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 180ms ease, visibility 180ms ease;
+    }
+
+    .modal-backdrop.is-open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .modal {
+      width: min(100%, 420px);
+      padding: 28px 28px 24px;
+      border-radius: 28px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 255, 0.94) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow:
+        0 32px 80px rgba(15, 23, 42, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      transform: translateY(10px) scale(0.98);
+      transition: transform 220ms ease;
+    }
+
+    .modal-backdrop.is-open .modal {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      margin-bottom: 18px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, rgba(31, 111, 255, 0.16), rgba(14, 165, 233, 0.14));
+      color: var(--brand-deep);
+      font-size: 24px;
+      font-weight: 800;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    .modal-badge.is-success {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(52, 211, 153, 0.14));
+      color: #0f9f6e;
+    }
+
+    .modal-title {
+      margin: 0 0 10px;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--text-main);
+    }
+
+    .modal-message {
+      margin: 0;
+      color: var(--text-sub);
+      font-size: 15px;
+      line-height: 1.7;
+      word-break: keep-all;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    .modal-btn {
+      min-width: 104px;
+      height: 48px;
+      padding: 0 20px;
+      border: none;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--brand), #338bff);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 12px 24px rgba(31, 111, 255, 0.18);
+      transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .modal-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 30px rgba(31, 111, 255, 0.22);
+    }
+
+    .modal-btn:active {
+      transform: translateY(0);
+    }
+
     @media (max-width: 920px) {
       .layout {
         grid-template-columns: 1fr;
@@ -430,6 +536,15 @@
 
       .file-badge {
         min-width: 92px;
+      }
+
+      .modal {
+        padding: 24px 20px 20px;
+        border-radius: 24px;
+      }
+
+      .modal-title {
+        font-size: 21px;
       }
     }
   </style>
@@ -527,13 +642,73 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="feedbackModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle" aria-describedby="feedbackModalMessage">
+      <div class="modal-badge" id="feedbackModalBadge">!</div>
+      <h3 class="modal-title" id="feedbackModalTitle">안내</h3>
+      <p class="modal-message" id="feedbackModalMessage"></p>
+      <div class="modal-actions">
+        <button class="modal-btn" id="feedbackModalButton" type="button">확인</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const fileInput = document.getElementById("excelFile");
     const fileMessage = document.getElementById("fileMessage");
+    const feedbackModal = document.getElementById("feedbackModal");
+    const feedbackModalBadge = document.getElementById("feedbackModalBadge");
+    const feedbackModalTitle = document.getElementById("feedbackModalTitle");
+    const feedbackModalMessage = document.getElementById("feedbackModalMessage");
+    const feedbackModalButton = document.getElementById("feedbackModalButton");
+    let modalCloseHandler = null;
 
     function updateFileMessage(message) {
       fileMessage.textContent = message;
     }
+
+    function closeFeedbackModal() {
+      feedbackModal.classList.remove("is-open");
+      feedbackModal.setAttribute("aria-hidden", "true");
+
+      const closeHandler = modalCloseHandler;
+      modalCloseHandler = null;
+
+      if (typeof closeHandler === "function") {
+        closeHandler();
+      }
+    }
+
+    function showFeedbackModal(message, options = {}) {
+      const title = options.title || "안내";
+      const variant = options.variant || "info";
+
+      feedbackModalTitle.textContent = title;
+      feedbackModalMessage.textContent = message;
+      feedbackModalBadge.textContent = variant === "success" ? "✓" : "!";
+      feedbackModalBadge.classList.toggle("is-success", variant === "success");
+      feedbackModal.classList.add("is-open");
+      feedbackModal.setAttribute("aria-hidden", "false");
+      modalCloseHandler = typeof options.onClose === "function" ? options.onClose : null;
+
+      requestAnimationFrame(() => {
+        feedbackModalButton.focus();
+      });
+    }
+
+    feedbackModalButton.addEventListener("click", closeFeedbackModal);
+
+    feedbackModal.addEventListener("click", (event) => {
+      if (event.target === feedbackModal) {
+        closeFeedbackModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && feedbackModal.classList.contains("is-open")) {
+        closeFeedbackModal();
+      }
+    });
 
     fileInput.addEventListener("change", () => {
       const file = fileInput.files[0];
@@ -555,13 +730,13 @@
       const file = fileInput.files[0];
 
       if (!file) {
-        alert("엑셀 파일을 선택해주세요.");
+        showFeedbackModal("엑셀 파일을 선택해주세요.");
         return;
       }
 
       if (!file.name.toLowerCase().endsWith(".xlsx")) {
         updateFileMessage(".xlsx 형식만 업로드할 수 있습니다.");
-        alert(".xlsx 형식의 엑셀 파일만 업로드할 수 있습니다.");
+        showFeedbackModal(".xlsx 형식의 엑셀 파일만 업로드할 수 있습니다.");
         return;
       }
 
@@ -582,7 +757,7 @@
         const json = XLSX.utils.sheet_to_json(sheet);
 
         if (!json.length) {
-          alert("엑셀에 데이터가 없습니다.");
+          showFeedbackModal("엑셀에 데이터가 없습니다.");
           return;
         }
 
@@ -593,7 +768,7 @@
         );
 
         if (!numberKey) {
-          alert("번호 컬럼(no, 번호, number, 연번…) 중 하나가 필요합니다.");
+          showFeedbackModal("번호 컬럼(no, 번호, number, 연번…) 중 하나가 필요합니다.");
           return;
         }
 
@@ -604,13 +779,18 @@
           .filter((value) => !excludeSet.has(value));
 
         if (numbers.length === 0) {
-          alert("제외 처리 후 남은 참가자가 없습니다.");
+          showFeedbackModal("제외 처리 후 남은 참가자가 없습니다.");
           return;
         }
 
         localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
-        alert(numbers.length + "명의 참가자를 저장했습니다!");
-        location.href = "index.html";
+        showFeedbackModal(numbers.length + "명의 참가자를 저장했습니다!", {
+          title: "저장 완료",
+          variant: "success",
+          onClose: () => {
+            location.href = "index.html";
+          }
+        });
       };
 
       reader.readAsBinaryString(file);

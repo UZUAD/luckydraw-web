@@ -11,8 +11,11 @@
   <style>
     :root {
       --text-main: #121826;
-      --box-border: rgba(107, 176, 255, 0.12);
-      --box-shadow: 0 22px 40px rgba(18, 35, 71, 0.14);
+      --box-border: rgba(160, 208, 255, 0.22);
+      --box-shadow: 0 22px 40px rgba(18, 35, 71, 0.1);
+      --box-surface-top: rgba(255, 255, 255, 0.22);
+      --box-surface-mid: rgba(241, 248, 255, 0.16);
+      --box-surface-bottom: rgba(229, 241, 255, 0.1);
       --digit-color: #173b7a;
       --digit-glow: rgba(96, 167, 255, 0.18);
       --digit-active: #116d8e;
@@ -73,12 +76,14 @@
       justify-content: center;
       border-radius: 28px;
       overflow: hidden;
+      background-color: rgba(255, 255, 255, 0.08);
       background:
-        radial-gradient(circle at top left, rgba(111, 187, 255, 0.28), transparent 42%),
-        linear-gradient(160deg, rgba(255, 255, 255, 0.72), rgba(241, 248, 255, 0.66) 48%, rgba(229, 241, 255, 0.58));
+        radial-gradient(circle at top left, rgba(111, 187, 255, 0.18), transparent 42%),
+        linear-gradient(160deg, var(--box-surface-top), var(--box-surface-mid) 48%, var(--box-surface-bottom));
       border: 1px solid var(--box-border);
       box-shadow: var(--box-shadow);
-      backdrop-filter: blur(18px) saturate(135%);
+      backdrop-filter: blur(22px) saturate(135%);
+      -webkit-backdrop-filter: blur(22px) saturate(135%);
       transition:
         transform 240ms ease,
         border-color 240ms ease,
@@ -92,9 +97,9 @@
       inset: 8px;
       border-radius: 22px;
       background:
-        radial-gradient(circle at top, rgba(255, 255, 255, 0.42), transparent 46%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(221, 236, 255, 0.12) 52%, rgba(255, 255, 255, 0.06));
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.18), transparent 46%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(221, 236, 255, 0.04) 52%, rgba(255, 255, 255, 0.02));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
       pointer-events: none;
     }
 
@@ -105,9 +110,9 @@
       height: 72%;
       top: -26%;
       left: -18%;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent);
       transform: rotate(-11deg);
-      opacity: 0.46;
+      opacity: 0.32;
       pointer-events: none;
     }
 
@@ -134,26 +139,26 @@
     }
 
     body.is-drawing .digit-box {
-      border-color: rgba(126, 221, 210, 0.18);
+      border-color: var(--box-border);
+      background-color: rgba(255, 255, 255, 0.08);
       background:
-        radial-gradient(circle at top left, rgba(112, 232, 214, 0.24), transparent 42%),
-        linear-gradient(160deg, rgba(255, 255, 255, 0.74), rgba(238, 251, 247, 0.7) 52%, rgba(226, 245, 240, 0.62));
-      box-shadow:
-        0 24px 46px rgba(28, 84, 120, 0.14),
-        0 0 24px rgba(112, 232, 214, 0.08);
+        radial-gradient(circle at top left, rgba(111, 187, 255, 0.18), transparent 42%),
+        linear-gradient(160deg, var(--box-surface-top), var(--box-surface-mid) 48%, var(--box-surface-bottom));
+      box-shadow: var(--box-shadow);
     }
 
     body.is-drawing .digit-box span {
-      color: var(--digit-active);
+      color: var(--digit-color);
     }
 
     .digit-box.reveal {
       border-color: rgba(85, 158, 255, 0.18);
+      background-color: rgba(239, 247, 255, 0.1);
       background:
-        radial-gradient(circle at top left, rgba(111, 187, 255, 0.24), transparent 42%),
-        linear-gradient(160deg, rgba(255, 255, 255, 0.76), rgba(241, 248, 255, 0.72) 52%, rgba(226, 239, 255, 0.62));
+        radial-gradient(circle at top left, rgba(111, 187, 255, 0.18), transparent 42%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(241, 248, 255, 0.18) 52%, rgba(226, 239, 255, 0.12));
       box-shadow:
-        0 24px 46px rgba(35, 86, 148, 0.12),
+        0 24px 46px rgba(35, 86, 148, 0.1),
         0 0 24px rgba(111, 187, 255, 0.1);
     }
 
