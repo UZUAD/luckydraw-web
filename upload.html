@@ -374,7 +374,7 @@
       height: 58px;
       border: none;
       border-radius: 18px;
-      background: linear-gradient(135deg, var(--brand), #338bff);
+      background: linear-gradient(135deg, #8ecbff, #6fb8ff);
       color: #ffffff;
       font-size: 16px;
       font-weight: 800;
@@ -385,6 +385,14 @@
 
     .submit-btn:hover {
       transform: translateY(-1px);
+      background: linear-gradient(135deg, #9fd5ff, #7dc2ff);
+    }
+
+    .submit-btn.is-complete {
+      background: linear-gradient(135deg, var(--brand), #338bff);
+    }
+
+    .submit-btn.is-complete:hover {
       background: linear-gradient(135deg, #216ef0, #237fff);
     }
 
@@ -428,6 +436,7 @@
       width: min(100%, 420px);
       padding: 28px 28px 24px;
       border-radius: 28px;
+      text-align: center;
       background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 255, 0.94) 100%);
       border: 1px solid rgba(255, 255, 255, 0.8);
@@ -443,12 +452,12 @@
     }
 
     .modal-badge {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       justify-content: center;
       width: 56px;
       height: 56px;
-      margin-bottom: 18px;
+      margin: 0 auto 18px;
       border-radius: 20px;
       background: linear-gradient(135deg, rgba(31, 111, 255, 0.16), rgba(14, 165, 233, 0.14));
       color: var(--brand-deep);
@@ -480,7 +489,7 @@
 
     .modal-actions {
       display: flex;
-      justify-content: flex-end;
+      justify-content: center;
       margin-top: 24px;
     }
 
@@ -556,7 +565,7 @@
       <article class="hero-card">
         <h2 class="hero-title">행사 추첨 운영을 위한 참가자 업로드 페이지</h2>
         <p class="hero-copy">
-          본 화면은 럭키드로우 프로젝트에서 사용할 참가자 번호를 엑셀 파일 기준으로 등록하고, <span class="no-break">제외 대상 반영 후</span> 추첨 화면으로 전달하기 위한 사전 준비 페이지입니다.
+          본 페이지는 럭키드로우 프로그램에서 사용할 참가자 번호를 엑셀 파일로 등록하고, <span class="no-break">제외 대상 반영 후</span> 추첨 화면으로 전달하기 위한 사전 준비 페이지입니다.
         </p>
       </article>
     </section>
@@ -588,7 +597,7 @@
 
           <div class="rule-item">
             <strong>5. 첫 번째 시트 및 추가 컬럼</strong>
-            <p>A열 번호 기준으로 업로드하며, 번호 컬럼이 정상적으로 구성되어 있으면 추가 컬럼은 함께 포함되어도 무방합니다. 빈 값이나 숫자가 아닌 데이터는 업로드 과정에서 자동 제외됩니다.</p>
+            <p>A열 번호 기준으로 추첨하며, 번호 컬럼이 정상적으로 구성되어 있으면 추가 컬럼은 함께 포함되어도 무방합니다. 빈 값이나 숫자가 아닌 데이터는 업로드 과정에서 자동 제외됩니다.</p>
           </div>
         </div>
       </article>
@@ -600,7 +609,7 @@
           <div class="sample-card">
             <strong>아래 링크로 예시 파일을 열어볼 수 있습니다.</strong>
             <a class="rule-link" href="files/luckydraw_sample.xlsx" target="_blank" rel="noopener">
-              예시 파일 보기
+              예시 파일 다운로드하기
             </a>
           </div>
 
@@ -632,11 +641,11 @@
             <div class="chip">빈 값 자동 제외</div>
           </div>
 
-          <button class="submit-btn" onclick="uploadExcel()">엑셀 업로드 후 럭키드로우 페이지로 이동</button>
+          <button class="submit-btn" id="submitButton" onclick="uploadExcel()">엑셀 업로드하고 추첨 화면으로 이동</button>
         </div>
 
         <div class="footer-note">
-          업로드가 완료되면 참가자 번호가 브라우저에 저장되고, 바로 추첨 화면으로 넘어갑니다.
+          엑셀 업로드하고 추첨 화면으로 이동 버튼을 누르면 참가자 번호가 저장되고, 바로 추첨 화면으로 이동합니다.
         </div>
       </article>
     </section>
@@ -661,6 +670,7 @@
     const feedbackModalTitle = document.getElementById("feedbackModalTitle");
     const feedbackModalMessage = document.getElementById("feedbackModalMessage");
     const feedbackModalButton = document.getElementById("feedbackModalButton");
+    const submitButton = document.getElementById("submitButton");
     let modalCloseHandler = null;
 
     function updateFileMessage(message) {
@@ -714,28 +724,33 @@
       const file = fileInput.files[0];
       if (!file) {
         updateFileMessage("선택된 파일이 없습니다.");
+        submitButton.classList.remove("is-complete");
         return;
       }
 
       if (!file.name.toLowerCase().endsWith(".xlsx")) {
         fileInput.value = "";
         updateFileMessage(".xlsx 형식만 업로드할 수 있습니다.");
+        submitButton.classList.remove("is-complete");
         return;
       }
 
       updateFileMessage(file.name);
+      submitButton.classList.add("is-complete");
     });
 
     function uploadExcel() {
       const file = fileInput.files[0];
 
       if (!file) {
+        submitButton.classList.remove("is-complete");
         showFeedbackModal("엑셀 파일을 선택해주세요.");
         return;
       }
 
       if (!file.name.toLowerCase().endsWith(".xlsx")) {
         updateFileMessage(".xlsx 형식만 업로드할 수 있습니다.");
+        submitButton.classList.remove("is-complete");
         showFeedbackModal(".xlsx 형식의 엑셀 파일만 업로드할 수 있습니다.");
         return;
       }
@@ -757,6 +772,7 @@
         const json = XLSX.utils.sheet_to_json(sheet);
 
         if (!json.length) {
+          submitButton.classList.remove("is-complete");
           showFeedbackModal("엑셀에 데이터가 없습니다.");
           return;
         }
@@ -768,7 +784,8 @@
         );
 
         if (!numberKey) {
-          showFeedbackModal("번호 컬럼(no, 번호, number, 연번…) 중 하나가 필요합니다.");
+          submitButton.classList.remove("is-complete");
+          showFeedbackModal("엑셀 파일에 번호 컬럼(no, 번호, number, 연번…) 중 하나가 필요합니다.");
           return;
         }
 
@@ -779,11 +796,13 @@
           .filter((value) => !excludeSet.has(value));
 
         if (numbers.length === 0) {
+          submitButton.classList.remove("is-complete");
           showFeedbackModal("제외 처리 후 남은 참가자가 없습니다.");
           return;
         }
 
         localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
+        submitButton.classList.add("is-complete");
         showFeedbackModal(numbers.length + "명의 참가자를 저장했습니다!", {
           title: "저장 완료",
           variant: "success",
