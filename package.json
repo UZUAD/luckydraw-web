@@ -1,0 +1,55 @@
+{
+  "name": "luckydraw-desktop",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Offline lucky draw desktop app with identical UI on macOS and Windows",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "electron .",
+    "self-test": "electron . --self-test",
+    "build:mac": "./build-macos-app.sh",
+    "build:win": "./build-windows-exe.sh"
+  },
+  "devDependencies": {
+    "electron": "41.7.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.lsjglobal.luckydraw",
+    "productName": "LuckyDraw",
+    "asar": true,
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "desktop/**/*",
+      "upload.html",
+      "index.html",
+      "vendor/**/*",
+      "files/**/*"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.entertainment",
+      "identity": null
+    },
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "LuckyDraw.exe"
+    }
+  }
+}
