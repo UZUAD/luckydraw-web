@@ -52,13 +52,36 @@ function resourcePathFromUrl(requestUrl) {
   return resourcePath;
 }
 
-async function openBundledFile(requestUrl) {
+async function nextAvailablePath(directoryPath, fileName) {
+  const extension = path.extname(fileName);
+  const baseName = path.basename(fileName, extension);
+  let candidatePath = path.join(directoryPath, fileName);
+  let suffix = 2;
+
+  while (true) {
+    try {
+      await fs.access(candidatePath);
+      candidatePath = path.join(directoryPath, `${baseName} (${suffix})${extension}`);
+      suffix += 1;
+    } catch (error) {
+      if (error.code === "ENOENT") return candidatePath;
+      throw error;
+    }
+  }
+}
+
+async function saveBundledFileToDownloads(requestUrl) {
   const sourcePath = resourcePathFromUrl(requestUrl);
   if (!sourcePath) return;
 
-  const destinationPath = path.join(app.getPath("temp"), path.basename(sourcePath));
+  const downloadsPath = SELF_TEST
+    ? path.join(app.getPath("userData"), "Downloads")
+    : app.getPath("downloads");
+  await fs.mkdir(downloadsPath, { recursive: true });
+  const destinationPath = await nextAvailablePath(downloadsPath, path.basename(sourcePath));
   await fs.copyFile(sourcePath, destinationPath);
-  await shell.openPath(destinationPath);
+  if (!SELF_TEST) shell.showItemInFolder(destinationPath);
+  return destinationPath;
 }
 
 function configureOfflineProtocol() {
@@ -86,7 +109,7 @@ function configureOfflineProtocol() {
 function configureWindowNavigation(window) {
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith(`${APP_SCHEME}://${APP_HOST}/`) && url.toLowerCase().endsWith(".xlsx")) {
-      openBundledFile(url).catch(() => {});
+      saveBundledFileToDownloads(url).catch(() => {});
     }
     return { action: "deny" };
   });
@@ -115,6 +138,21 @@ function installSelfTest(window) {
 
     try {
       if (stage === 0 && url.endsWith("/upload.html")) {
+        const firstDownload = await saveBundledFileToDownloads(
+          `${APP_SCHEME}://${APP_HOST}/files/luckydraw_sample.xlsx`
+        );
+        const secondDownload = await saveBundledFileToDownloads(
+          `${APP_SCHEME}://${APP_HOST}/files/luckydraw_sample.xlsx`
+        );
+        const downloadsPath = path.join(app.getPath("userData"), "Downloads");
+        if (
+          path.dirname(firstDownload) !== downloadsPath ||
+          path.basename(firstDownload) !== "luckydraw_sample.xlsx" ||
+          path.basename(secondDownload) !== "luckydraw_sample (2).xlsx"
+        ) {
+          throw new Error("download folder or duplicate file naming validation failed");
+        }
+
         if (CAPTURE_DIR) {
           await fs.mkdir(CAPTURE_DIR, { recursive: true });
           const image = await window.webContents.capturePage();
@@ -231,7 +269,7 @@ function installSelfTest(window) {
         clearTimeout(timeout);
 
         if (!passed) throw new Error(`draw screen validation failed: ${JSON.stringify(result)}`);
-        process.stdout.write("SELF_TEST_OK: shared UI, offline assets, range data, responsive stage, and local background loaded\n");
+        process.stdout.write("SELF_TEST_OK: Downloads save, offline assets, range data, responsive stage, and local background loaded\n");
         app.exit(0);
       }
     } catch (error) {
