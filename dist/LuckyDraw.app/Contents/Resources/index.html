@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>럭키드로우 — 추첨</title>
+
+  <script src="vendor/confetti.browser.min.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --text-main: #f7f7f7;
+      --digit-color: #ffffff;
+      --digit-reveal: #ffffff;
+      --stage-width: 2304px;
+      --stage-height: 640px;
+      --stage-scale: 1;
+      --panel-bottom-offset: 272px;
+      --digit-width: 112px;
+      --digit-height: 136px;
+      --digit-gap: 18px;
+      --digit-font-size: 104px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+      font-family: "SUIT Variable", "Pretendard Variable", "Noto Sans KR", sans-serif;
+      color: var(--text-main);
+      background: #000;
+    }
+
+    body::before {
+      content: none;
+    }
+
+    body::after {
+      content: none;
+    }
+
+    .stage {
+      position: relative;
+      z-index: 1;
+      width: var(--stage-width);
+      height: var(--stage-height);
+      overflow: hidden;
+      background: #000;
+      transform: scale(var(--stage-scale));
+      transform-origin: center center;
+    }
+
+    .digits-wrapper {
+      position: absolute;
+      left: 50%;
+      bottom: var(--panel-bottom-offset);
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, var(--digit-width)));
+      gap: var(--digit-gap);
+      align-items: center;
+      padding: 0;
+      transform: translateX(-50%);
+      justify-content: center;
+    }
+
+    .digits-wrapper::before {
+      content: none;
+    }
+
+    .digits-wrapper::after {
+      content: none;
+    }
+
+    .digit-box {
+      position: relative;
+      width: var(--digit-width);
+      height: var(--digit-height);
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.92);
+      border: 2px solid rgba(255, 255, 255, 0.86);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+      transition:
+        transform 240ms ease,
+        border-color 240ms ease,
+        box-shadow 240ms ease,
+        background 240ms ease;
+    }
+
+    .digit-box::before {
+      content: none;
+    }
+
+    .digit-box::after {
+      content: none;
+    }
+
+    .digit-box span {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      font-size: var(--digit-font-size);
+      font-family: "Arial Black", "Helvetica Neue", sans-serif;
+      font-weight: 900;
+      line-height: 0.88;
+      letter-spacing: -0.03em;
+      text-align: center;
+      transform: translate(-50%, -52%);
+      color: var(--digit-color);
+      text-shadow: none;
+      transition:
+        transform 240ms ease,
+        color 240ms ease,
+        text-shadow 240ms ease;
+    }
+
+    body.is-drawing .digit-box {
+      background: rgba(0, 0, 0, 0.92);
+      border-color: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    body.is-drawing .digit-box span {
+      color: #ffffff;
+    }
+
+    .digit-box.reveal {
+      background: rgba(0, 0, 0, 0.92);
+      border-color: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
+    }
+
+    .digit-box.reveal span {
+      color: var(--digit-reveal);
+      transform: translate(-50%, -52%) scale(1.01);
+      text-shadow: none;
+    }
+
+    .digit-box {
+      border-radius: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="stage">
+    <div class="digits-wrapper" aria-label="추첨 번호">
+      <div class="digit-box" id="d1"><span>0</span></div>
+      <div class="digit-box" id="d2"><span>0</span></div>
+      <div class="digit-box" id="d3"><span>0</span></div>
+      <div class="digit-box" id="d4"><span>0</span></div>
+      <div class="digit-box" id="d5"><span>0</span></div>
+    </div>
+  </div>
+
+  <script>
+    const stage = document.querySelector(".stage");
+    const digitBoxes = [
+      document.getElementById("d1"),
+      document.getElementById("d2"),
+      document.getElementById("d3"),
+      document.getElementById("d4"),
+      document.getElementById("d5")
+    ];
+
+    const digits = digitBoxes.map((box) => box.querySelector("span"));
+
+    function updateStageScale() {
+      const baseWidth = 2304;
+      const baseHeight = 640;
+      const scale = Math.min(window.innerWidth / baseWidth, window.innerHeight / baseHeight);
+      stage.style.setProperty("--stage-scale", scale.toString());
+    }
+
+    updateStageScale();
+    window.addEventListener("resize", updateStageScale);
+    document.addEventListener("fullscreenchange", updateStageScale);
+
+    let numbers = JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]");
+    if (numbers.length === 0) {
+      alert("업로드된 참가자 데이터가 없습니다.\n업로드 페이지로 이동합니다.");
+      location.href = "upload.html";
+    }
+
+    function randomDigit() {
+      return Math.floor(Math.random() * 10);
+    }
+
+    function playConfetti() {
+      if (typeof confetti !== "function") return;
+
+      const defaults = { particleCount: 44, spread: 72, startVelocity: 28 };
+      confetti({ ...defaults, origin: { x: 0.18, y: 0.14 } });
+      confetti({ ...defaults, origin: { x: 0.5, y: 0.12 } });
+      confetti({ ...defaults, origin: { x: 0.82, y: 0.14 } });
+    }
+
+    function clearRevealState() {
+      digitBoxes.forEach((box) => box.classList.remove("reveal"));
+    }
+
+    function revealTarget(target) {
+      [...target].forEach((n, i) => {
+        setTimeout(() => {
+          digits[i].textContent = n;
+          digitBoxes[i].classList.add("reveal");
+        }, i * 120);
+      });
+    }
+
+    let isPlaying = false;
+
+    function startDraw() {
+      if (isPlaying || numbers.length === 0) return;
+
+      isPlaying = true;
+      clearRevealState();
+      document.body.classList.add("is-drawing");
+
+      const index = Math.floor(Math.random() * numbers.length);
+      const target = numbers[index];
+
+      const spin = setInterval(() => {
+        digits.forEach((digit) => {
+          digit.textContent = randomDigit();
+        });
+      }, 72);
+
+      setTimeout(() => {
+        clearInterval(spin);
+        revealTarget(target);
+
+        numbers.splice(index, 1);
+        localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
+
+        setTimeout(() => {
+          playConfetti();
+          document.body.classList.remove("is-drawing");
+          isPlaying = false;
+        }, 860);
+      }, 3600);
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") startDraw();
+    });
+  </script>
+
+  <script>
+    // 테스트용 시뮬레이션(현재 사용 x)
+    async function simulateDraw(count = 500) {
+      const results = [];
+      let executed = 0;
+
+      function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      while (executed < count && numbers.length > 0) {
+        startDraw();
+        executed++;
+
+        await wait(4700);
+
+        const picked = digits.map((digit) => digit.textContent).join("");
+        results.push({
+          order: executed,
+          winner: picked
+        });
+      }
+
+      console.log("시뮬레이션 결과", results);
+
+      const ws = XLSX.utils.json_to_sheet(results);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Simulation");
+      XLSX.writeFile(wb, "luckydraw_real_simulation.xlsx");
+
+      alert("시뮬레이션 완료");
+    }
+  </script>
+</body>
+</html>

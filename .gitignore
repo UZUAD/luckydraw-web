@@ -1,0 +1,4 @@
+.DS_Store
+.build/
+windows/bin/
+windows/obj/

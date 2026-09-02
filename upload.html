@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>럭키드로우</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
 
   <style>
     :root {
@@ -229,6 +229,64 @@
       gap: 18px;
     }
 
+    .method-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding: 6px;
+      border-radius: 18px;
+      background: rgba(241, 245, 251, 0.92);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .method-tab {
+      min-height: 48px;
+      padding: 0 14px;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      background: transparent;
+      color: #667186;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .method-tab:hover {
+      color: var(--brand-deep);
+    }
+
+    .method-tab.is-active {
+      color: var(--brand-deep);
+      background: #ffffff;
+      border-color: rgba(31, 111, 255, 0.12);
+      box-shadow: 0 8px 18px rgba(31, 111, 255, 0.08);
+    }
+
+    .method-panel {
+      display: grid;
+      gap: 18px;
+    }
+
+    .method-panel[hidden] {
+      display: none;
+    }
+
+    .range-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .range-preview {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--brand-soft);
+      color: #35507d;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
     .field label {
       display: block;
       margin-bottom: 10px;
@@ -346,6 +404,10 @@
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
+    }
+
+    .quick-guide[hidden] {
+      display: none;
     }
 
     .chip {
@@ -547,6 +609,10 @@
         min-width: 92px;
       }
 
+      .range-grid {
+        grid-template-columns: 1fr;
+      }
+
       .modal {
         padding: 24px 20px 20px;
         border-radius: 24px;
@@ -565,15 +631,15 @@
       <article class="hero-card">
         <h2 class="hero-title">행사 추첨 운영을 위한 참가자 업로드 페이지</h2>
         <p class="hero-copy">
-          본 페이지는 럭키드로우 프로그램에서 사용할 참가자 번호를 엑셀 파일로 등록하고, <span class="no-break">제외 대상 반영 후</span> 추첨 화면으로 전달하기 위한 사전 준비 페이지입니다.
+          본 페이지는 럭키드로우 프로그램에서 사용할 참가자 번호를 엑셀 파일 또는 번호 범위로 등록하고, <span class="no-break">제외 대상 반영 후</span> 추첨 화면으로 전달하기 위한 사전 준비 페이지입니다.
         </p>
       </article>
     </section>
 
     <section class="layout">
       <article class="card">
-        <h2 class="card-title">업로드 규칙</h2>
-       
+        <h2 class="card-title">등록 규칙</h2>
+
         <div class="rules">
           <div class="rule-item">
             <strong>1. 데이터 시작 위치</strong>
@@ -599,29 +665,62 @@
             <strong>5. 첫 번째 시트 및 추가 컬럼</strong>
             <p>A열 번호 기준으로 추첨하며, 번호 컬럼이 정상적으로 구성되어 있으면 추가 컬럼은 함께 포함되어도 무방합니다. 빈 값이나 숫자가 아닌 데이터는 업로드 과정에서 자동 제외됩니다.</p>
           </div>
+
+          <div class="rule-item">
+            <strong>6. 번호 범위 직접 입력</strong>
+            <p>엑셀 없이 시작 번호와 끝 번호를 입력하면 해당 범위의 번호가 모두 생성되며, 추첨 제외 번호도 동일하게 반영됩니다.</p>
+          </div>
         </div>
       </article>
 
       <article class="card">
-        <h2 class="card-title">엑셀 업로드</h2>
+        <h2 class="card-title">참가자 번호 등록</h2>
+        <p class="card-desc">엑셀 파일을 업로드하거나 시작 번호와 끝 번호를 직접 입력하세요.</p>
 
         <div class="form-grid">
-          <div class="sample-card">
-            <strong>아래 링크로 예시 파일을 열어볼 수 있습니다.</strong>
-            <a class="rule-link" href="files/luckydraw_sample.xlsx" target="_blank" rel="noopener">
-              예시 파일 다운로드하기
-            </a>
+          <div class="method-tabs" role="tablist" aria-label="참가자 번호 등록 방식">
+            <button class="method-tab is-active" id="excelTab" type="button" role="tab" aria-selected="true" aria-controls="excelPanel" data-mode="excel">엑셀 업로드</button>
+            <button class="method-tab" id="rangeTab" type="button" role="tab" aria-selected="false" aria-controls="rangePanel" data-mode="range">번호 범위 입력</button>
           </div>
 
-          <div class="field upload-file-field">
-            <div class="field-head">
-              <label for="excelFile">업로드 파일</label>
-              <label class="file-badge" for="excelFile"><span>파일 선택</span></label>
+          <div class="method-panel" id="excelPanel" role="tabpanel" aria-labelledby="excelTab">
+            <div class="sample-card">
+              <strong>아래 링크로 예시 파일을 열어볼 수 있습니다.</strong>
+              <a class="rule-link" href="files/luckydraw_sample.xlsx" target="_blank" rel="noopener">
+                예시 파일 다운로드하기
+              </a>
             </div>
-            <div class="file-picker">
-              <span class="file-message" id="fileMessage">선택된 파일이 없습니다.</span>
+
+            <div class="field upload-file-field">
+              <div class="field-head">
+                <label for="excelFile">업로드 파일</label>
+                <label class="file-badge" for="excelFile"><span>파일 선택</span></label>
+              </div>
+              <div class="file-picker">
+                <span class="file-message" id="fileMessage">선택된 파일이 없습니다.</span>
+              </div>
+              <input class="hidden-file" type="file" id="excelFile" accept=".xlsx" />
             </div>
-            <input class="hidden-file" type="file" id="excelFile" accept=".xlsx" />
+          </div>
+
+          <div class="method-panel" id="rangePanel" role="tabpanel" aria-labelledby="rangeTab" hidden>
+            <div class="sample-card">
+              <strong>번호 범위를 입력하면 모든 번호가 자동으로 생성됩니다.</strong>
+              <p>예: 시작 1, 끝 500 → 00001부터 00500까지 등록</p>
+            </div>
+
+            <div class="range-grid">
+              <div class="field">
+                <label for="startNumber">시작 번호</label>
+                <input class="text-input" type="number" id="startNumber" min="0" max="99999" step="1" inputmode="numeric" placeholder="예: 1" />
+              </div>
+              <div class="field">
+                <label for="endNumber">끝 번호</label>
+                <input class="text-input" type="number" id="endNumber" min="0" max="99999" step="1" inputmode="numeric" placeholder="예: 500" />
+              </div>
+            </div>
+
+            <div class="range-preview" id="rangePreview" aria-live="polite">시작 번호와 끝 번호를 입력해주세요.</div>
           </div>
 
           <div class="field">
@@ -635,17 +734,23 @@
             <div class="field-hint">쉼표로 구분해서 입력하면 해당 번호는 저장 단계에서 제외됩니다.</div>
           </div>
 
-          <div class="quick-guide">
+          <div class="quick-guide" id="excelQuickGuide">
             <div class="chip">첫 번째 시트 사용</div>
             <div class="chip">번호 자동 5자리 보정</div>
             <div class="chip">빈 값 자동 제외</div>
           </div>
 
-          <button class="submit-btn" id="submitButton" onclick="uploadExcel()">엑셀 업로드하고 추첨 화면으로 이동</button>
+          <div class="quick-guide" id="rangeQuickGuide" hidden>
+            <div class="chip">시작·끝 번호 포함</div>
+            <div class="chip">번호 자동 5자리 보정</div>
+            <div class="chip">제외 번호 자동 반영</div>
+          </div>
+
+          <button class="submit-btn" id="submitButton" type="button">엑셀 업로드하고 추첨 화면으로 이동</button>
         </div>
 
         <div class="footer-note">
-          엑셀 업로드하고 추첨 화면으로 이동 버튼을 누르면 참가자 번호가 저장되고, 바로 추첨 화면으로 이동합니다.
+          등록하고 추첨 화면으로 이동 버튼을 누르면 참가자 번호가 저장되고, 바로 추첨 화면으로 이동합니다.
         </div>
       </article>
     </section>
@@ -671,6 +776,15 @@
     const feedbackModalMessage = document.getElementById("feedbackModalMessage");
     const feedbackModalButton = document.getElementById("feedbackModalButton");
     const submitButton = document.getElementById("submitButton");
+    const methodTabs = document.querySelectorAll(".method-tab");
+    const excelPanel = document.getElementById("excelPanel");
+    const rangePanel = document.getElementById("rangePanel");
+    const startNumberInput = document.getElementById("startNumber");
+    const endNumberInput = document.getElementById("endNumber");
+    const rangePreview = document.getElementById("rangePreview");
+    const excelQuickGuide = document.getElementById("excelQuickGuide");
+    const rangeQuickGuide = document.getElementById("rangeQuickGuide");
+    let activeMode = "excel";
     let modalCloseHandler = null;
 
     function updateFileMessage(message) {
@@ -720,6 +834,37 @@
       }
     });
 
+    function updateSubmitState() {
+      if (activeMode === "excel") {
+        submitButton.textContent = "엑셀 업로드하고 추첨 화면으로 이동";
+        submitButton.classList.toggle("is-complete", Boolean(fileInput.files[0]));
+        return;
+      }
+
+      submitButton.textContent = "번호 범위 등록하고 추첨 화면으로 이동";
+      const hasRange = startNumberInput.value !== "" && endNumberInput.value !== "";
+      submitButton.classList.toggle("is-complete", hasRange);
+    }
+
+    function selectRegistrationMode(mode) {
+      activeMode = mode;
+      methodTabs.forEach((tab) => {
+        const isActive = tab.dataset.mode === mode;
+        tab.classList.toggle("is-active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+      });
+
+      excelPanel.hidden = mode !== "excel";
+      rangePanel.hidden = mode !== "range";
+      excelQuickGuide.hidden = mode !== "excel";
+      rangeQuickGuide.hidden = mode !== "range";
+      updateSubmitState();
+    }
+
+    methodTabs.forEach((tab) => {
+      tab.addEventListener("click", () => selectRegistrationMode(tab.dataset.mode));
+    });
+
     fileInput.addEventListener("change", () => {
       const file = fileInput.files[0];
       if (!file) {
@@ -736,7 +881,100 @@
       }
 
       updateFileMessage(file.name);
+      updateSubmitState();
+    });
+
+    function getExcludeSet() {
+      return new Set(
+        document.getElementById("excludeNumbers").value
+          .split(",")
+          .map((value) => value.trim())
+          .filter((value) => /^\d+$/.test(value))
+          .map((value) => value.padStart(5, "0"))
+      );
+    }
+
+    function updateRangePreview() {
+      const startValue = startNumberInput.value;
+      const endValue = endNumberInput.value;
+
+      if (startValue === "" || endValue === "") {
+        rangePreview.textContent = "시작 번호와 끝 번호를 입력해주세요.";
+        updateSubmitState();
+        return;
+      }
+
+      const start = Number(startValue);
+      const end = Number(endValue);
+
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end > 99999 || start > end) {
+        rangePreview.textContent = "0부터 99999 사이에서 끝 번호를 시작 번호보다 크게 입력해주세요.";
+        updateSubmitState();
+        return;
+      }
+
+      const total = end - start + 1;
+      rangePreview.textContent = `${String(start).padStart(5, "0")}부터 ${String(end).padStart(5, "0")}까지 총 ${total.toLocaleString("ko-KR")}개 번호가 등록됩니다.`;
+      updateSubmitState();
+    }
+
+    startNumberInput.addEventListener("input", updateRangePreview);
+    endNumberInput.addEventListener("input", updateRangePreview);
+
+    function saveNumbersAndContinue(numbers) {
+      localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
       submitButton.classList.add("is-complete");
+      showFeedbackModal(numbers.length + "명의 참가자를 저장했습니다!", {
+        title: "저장 완료",
+        variant: "success",
+        onClose: () => {
+          location.href = "index.html";
+        }
+      });
+    }
+
+    function registerNumberRange() {
+      const start = Number(startNumberInput.value);
+      const end = Number(endNumberInput.value);
+
+      if (startNumberInput.value === "" || endNumberInput.value === "") {
+        showFeedbackModal("시작 번호와 끝 번호를 모두 입력해주세요.");
+        return;
+      }
+
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || start > 99999 || end < 0 || end > 99999) {
+        showFeedbackModal("시작 번호와 끝 번호는 0부터 99999 사이의 정수로 입력해주세요.");
+        return;
+      }
+
+      if (start > end) {
+        showFeedbackModal("끝 번호는 시작 번호보다 크거나 같아야 합니다.");
+        return;
+      }
+
+      const excludeSet = getExcludeSet();
+      const numbers = [];
+      for (let value = start; value <= end; value++) {
+        const number = String(value).padStart(5, "0");
+        if (!excludeSet.has(number)) numbers.push(number);
+      }
+
+      if (numbers.length === 0) {
+        submitButton.classList.remove("is-complete");
+        showFeedbackModal("제외 처리 후 남은 참가자가 없습니다.");
+        return;
+      }
+
+      saveNumbersAndContinue(numbers);
+    }
+
+    submitButton.addEventListener("click", () => {
+      if (activeMode === "range") {
+        registerNumberRange();
+        return;
+      }
+
+      uploadExcel();
     });
 
     function uploadExcel() {
@@ -755,14 +993,7 @@
         return;
       }
 
-      const excludeInput = document.getElementById("excludeNumbers").value;
-      const excludeSet = new Set(
-        excludeInput
-          .split(",")
-          .map((value) => value.trim())
-          .filter((value) => value !== "")
-          .map((value) => value.padStart(5, "0"))
-      );
+      const excludeSet = getExcludeSet();
 
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -801,15 +1032,7 @@
           return;
         }
 
-        localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
-        submitButton.classList.add("is-complete");
-        showFeedbackModal(numbers.length + "명의 참가자를 저장했습니다!", {
-          title: "저장 완료",
-          variant: "success",
-          onClose: () => {
-            location.href = "index.html";
-          }
-        });
+        saveNumbersAndContinue(numbers);
       };
 
       reader.readAsBinaryString(file);

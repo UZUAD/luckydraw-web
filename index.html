@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>럭키드로우 — 추첨</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="vendor/confetti.browser.min.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
 
   <style>
     :root {
@@ -59,7 +59,7 @@
       width: var(--stage-width);
       height: var(--stage-height);
       overflow: hidden;
-      background: url("images/logitech-lucky-draw-bg.png") center / 100% 100% no-repeat;
+      background: #000;
       transform: scale(var(--stage-scale));
       transform-origin: center center;
     }
