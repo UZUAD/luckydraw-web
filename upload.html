@@ -6,6 +6,7 @@
   <title>럭키드로우</title>
 
   <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/background-store.js"></script>
 
   <style>
     :root {
@@ -382,6 +383,75 @@
       gap: 8px;
     }
 
+    .background-settings {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border-radius: 20px;
+      background: rgba(248, 250, 253, 0.92);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .background-settings-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .background-preview {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 5;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      background-color: #050505;
+      background-position: center;
+      background-repeat: no-repeat;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .background-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .secondary-btn,
+    .select-input {
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid rgba(31, 111, 255, 0.14);
+      border-radius: 14px;
+      background: #ffffff;
+      color: #35507d;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .secondary-btn {
+      cursor: pointer;
+    }
+
+    .secondary-btn:disabled {
+      cursor: default;
+      opacity: 0.45;
+    }
+
+    .background-message {
+      flex: 1 1 180px;
+      color: #758095;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
     .text-input {
       width: 100%;
       height: 54px;
@@ -734,6 +804,23 @@
             <div class="field-hint">쉼표로 구분해서 입력하면 해당 번호는 저장 단계에서 제외됩니다.</div>
           </div>
 
+          <section class="background-settings" aria-labelledby="backgroundSettingsTitle">
+            <h3 class="background-settings-title" id="backgroundSettingsTitle">행사 배경 이미지</h3>
+            <div class="background-preview" id="backgroundPreview">
+              <span id="backgroundPreviewEmpty">배경을 등록하지 않으면 검은 화면으로 표시됩니다.</span>
+            </div>
+            <div class="background-controls">
+              <label class="file-badge" for="backgroundFile"><span>이미지 선택</span></label>
+              <input class="hidden-file" type="file" id="backgroundFile" accept="image/png,image/jpeg,image/webp" />
+              <select class="select-input" id="backgroundFit" aria-label="배경 이미지 표시 방식">
+                <option value="cover">화면 채우기</option>
+                <option value="contain">전체 이미지 보기</option>
+              </select>
+              <button class="secondary-btn" id="removeBackgroundButton" type="button" disabled>배경 삭제</button>
+            </div>
+            <div class="background-message" id="backgroundMessage">PNG, JPG, WebP 이미지를 앱 안에 저장해 오프라인으로 사용합니다.</div>
+          </section>
+
           <div class="quick-guide" id="excelQuickGuide">
             <div class="chip">첫 번째 시트 사용</div>
             <div class="chip">번호 자동 5자리 보정</div>
@@ -784,8 +871,88 @@
     const rangePreview = document.getElementById("rangePreview");
     const excelQuickGuide = document.getElementById("excelQuickGuide");
     const rangeQuickGuide = document.getElementById("rangeQuickGuide");
+    const backgroundFileInput = document.getElementById("backgroundFile");
+    const backgroundFitSelect = document.getElementById("backgroundFit");
+    const backgroundPreview = document.getElementById("backgroundPreview");
+    const backgroundPreviewEmpty = document.getElementById("backgroundPreviewEmpty");
+    const backgroundMessage = document.getElementById("backgroundMessage");
+    const removeBackgroundButton = document.getElementById("removeBackgroundButton");
     let activeMode = "excel";
     let modalCloseHandler = null;
+    let backgroundPreviewUrl = null;
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    }
+
+    function setBackgroundPreview(record) {
+      if (backgroundPreviewUrl) URL.revokeObjectURL(backgroundPreviewUrl);
+      backgroundPreviewUrl = null;
+
+      if (!record || !record.blob) {
+        backgroundPreview.style.backgroundImage = "none";
+        backgroundPreviewEmpty.hidden = false;
+        backgroundMessage.textContent = "PNG, JPG, WebP 이미지를 앱 안에 저장해 오프라인으로 사용합니다.";
+        removeBackgroundButton.disabled = true;
+        return;
+      }
+
+      backgroundPreviewUrl = URL.createObjectURL(record.blob);
+      backgroundPreview.style.backgroundImage = `url(${JSON.stringify(backgroundPreviewUrl)})`;
+      backgroundPreviewEmpty.hidden = true;
+      backgroundMessage.textContent = `${record.name} · ${formatFileSize(record.size)}`;
+      removeBackgroundButton.disabled = false;
+    }
+
+    async function loadBackgroundSettings() {
+      const fit = localStorage.getItem("luckydraw_background_fit") || "cover";
+      backgroundFitSelect.value = fit === "contain" ? "contain" : "cover";
+      backgroundPreview.style.backgroundSize = backgroundFitSelect.value;
+
+      try {
+        setBackgroundPreview(await LuckyDrawBackground.get());
+      } catch {
+        backgroundMessage.textContent = "저장된 배경 이미지를 불러오지 못했습니다.";
+      }
+    }
+
+    backgroundFitSelect.addEventListener("change", () => {
+      localStorage.setItem("luckydraw_background_fit", backgroundFitSelect.value);
+      backgroundPreview.style.backgroundSize = backgroundFitSelect.value;
+    });
+
+    backgroundFileInput.addEventListener("change", async () => {
+      const file = backgroundFileInput.files[0];
+      if (!file) return;
+
+      if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+        backgroundFileInput.value = "";
+        showFeedbackModal("PNG, JPG, WebP 형식의 이미지를 선택해주세요.");
+        return;
+      }
+
+      try {
+        backgroundMessage.textContent = "배경 이미지를 저장하고 있습니다…";
+        await LuckyDrawBackground.save(file);
+        setBackgroundPreview(await LuckyDrawBackground.get());
+      } catch {
+        showFeedbackModal("배경 이미지를 저장하지 못했습니다. 다른 이미지를 선택해주세요.");
+      } finally {
+        backgroundFileInput.value = "";
+      }
+    });
+
+    removeBackgroundButton.addEventListener("click", async () => {
+      try {
+        await LuckyDrawBackground.remove();
+        setBackgroundPreview(null);
+      } catch {
+        showFeedbackModal("배경 이미지를 삭제하지 못했습니다.");
+      }
+    });
+
+    loadBackgroundSettings();
 
     function updateFileMessage(message) {
       fileMessage.textContent = message;

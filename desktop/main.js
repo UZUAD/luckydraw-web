@@ -1,11 +1,16 @@
 const { app, BrowserWindow, Menu, net, protocol, session, shell } = require("electron");
 const fs = require("node:fs/promises");
+const os = require("node:os");
 const path = require("node:path");
 
 const APP_SCHEME = "luckydraw";
 const APP_HOST = "app";
 const SELF_TEST = process.argv.includes("--self-test");
 const CAPTURE_DIR = process.env.LUCKYDRAW_CAPTURE_DIR;
+
+if (SELF_TEST) {
+  app.setPath("userData", path.join(os.tmpdir(), `luckydraw-self-test-${process.pid}`));
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -117,8 +122,17 @@ function installSelfTest(window) {
         }
 
         const result = await window.webContents.executeJavaScript(`
-          (() => {
+          (async () => {
             if (typeof XLSX === "undefined") return "XLSX_MISSING";
+            if (typeof LuckyDrawBackground === "undefined") return "BACKGROUND_STORE_MISSING";
+            const canvas = document.createElement("canvas");
+            canvas.width = 32;
+            canvas.height = 18;
+            const context = canvas.getContext("2d");
+            context.fillStyle = "#123456";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            const backgroundBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+            await LuckyDrawBackground.save(new File([backgroundBlob], "self-test.png", { type: "image/png" }));
             document.getElementById("rangeTab").click();
             const start = document.getElementById("startNumber");
             const end = document.getElementById("endNumber");
@@ -155,28 +169,69 @@ function installSelfTest(window) {
           await fs.writeFile(path.join(CAPTURE_DIR, "draw-ui.png"), image.toPNG());
         }
 
+        const layoutResults = [];
+        for (const [width, height] of [[1920, 1080], [3840, 2160], [5120, 1440]]) {
+          window.setContentSize(width, height);
+          await new Promise((resolve) => setTimeout(resolve, 120));
+          layoutResults.push(await window.webContents.executeJavaScript(`
+            (() => {
+              const stageBounds = document.querySelector(".stage").getBoundingClientRect();
+              const digitsBounds = document.querySelector(".digits-wrapper").getBoundingClientRect();
+              return {
+                viewportWidth: window.innerWidth,
+                viewportHeight: window.innerHeight,
+                stageWidth: stageBounds.width,
+                stageHeight: stageBounds.height,
+                digitsLeft: digitsBounds.left,
+                digitsTop: digitsBounds.top,
+                digitsRight: digitsBounds.right,
+                digitsBottom: digitsBounds.bottom
+              };
+            })()
+          `));
+        }
+
         const result = await window.webContents.executeJavaScript(`
-          (() => ({
+          (async () => {
+            await window.luckyDrawBackgroundReady;
+            return ({
             numbers: JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]"),
             digitCount: document.querySelectorAll(".digit-box").length,
             background: getComputedStyle(document.querySelector(".stage")).backgroundColor,
+            backgroundImage: getComputedStyle(document.querySelector(".stage")).backgroundImage,
+            stageWidth: document.querySelector(".stage").getBoundingClientRect().width,
+            viewportWidth: window.innerWidth,
             confettiType: typeof confetti
-          }))()
+            });
+          })()
         `);
 
         const passed =
           JSON.stringify(result.numbers) === JSON.stringify(["00012", "00014"]) &&
           result.digitCount === 5 &&
           result.background === "rgb(0, 0, 0)" &&
+          result.backgroundImage !== "none" &&
+          Math.abs(result.stageWidth - result.viewportWidth) < 1 &&
+          layoutResults.every((layout) =>
+            Math.abs(layout.stageWidth - layout.viewportWidth) < 1 &&
+            Math.abs(layout.stageHeight - layout.viewportHeight) < 1 &&
+            layout.digitsLeft >= 0 &&
+            layout.digitsTop >= 0 &&
+            layout.digitsRight <= layout.viewportWidth &&
+            layout.digitsBottom <= layout.viewportHeight
+          ) &&
           result.confettiType === "function";
 
         await window.webContents.executeJavaScript(
-          `localStorage.removeItem("luckydraw_numbers")`
+          `Promise.all([
+            LuckyDrawBackground.remove(),
+            Promise.resolve(localStorage.removeItem("luckydraw_numbers"))
+          ])`
         );
         clearTimeout(timeout);
 
         if (!passed) throw new Error(`draw screen validation failed: ${JSON.stringify(result)}`);
-        process.stdout.write("SELF_TEST_OK: shared UI, offline assets, range data, and black draw screen loaded\n");
+        process.stdout.write("SELF_TEST_OK: shared UI, offline assets, range data, responsive stage, and local background loaded\n");
         app.exit(0);
       }
     } catch (error) {

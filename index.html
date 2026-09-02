@@ -7,6 +7,7 @@
 
   <script src="vendor/confetti.browser.min.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/background-store.js"></script>
 
   <style>
     :root {
@@ -16,7 +17,6 @@
       --stage-width: 2304px;
       --stage-height: 640px;
       --stage-scale: 1;
-      --panel-bottom-offset: 272px;
       --digit-width: 112px;
       --digit-height: 136px;
       --digit-gap: 18px;
@@ -56,24 +56,26 @@
     .stage {
       position: relative;
       z-index: 1;
-      width: var(--stage-width);
-      height: var(--stage-height);
+      width: 100vw;
+      height: 100vh;
       overflow: hidden;
-      background: #000;
-      transform: scale(var(--stage-scale));
-      transform-origin: center center;
+      background-color: #000;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
     }
 
     .digits-wrapper {
       position: absolute;
       left: 50%;
-      bottom: var(--panel-bottom-offset);
+      top: calc(50% - (20px * var(--stage-scale)));
       display: grid;
       grid-template-columns: repeat(5, minmax(0, var(--digit-width)));
       gap: var(--digit-gap);
       align-items: center;
       padding: 0;
-      transform: translateX(-50%);
+      transform: translate(-50%, -50%) scale(var(--stage-scale));
+      transform-origin: center;
       justify-content: center;
     }
 
@@ -184,6 +186,7 @@
     ];
 
     const digits = digitBoxes.map((box) => box.querySelector("span"));
+    let backgroundObjectUrl = null;
 
     function updateStageScale() {
       const baseWidth = 2304;
@@ -192,7 +195,26 @@
       stage.style.setProperty("--stage-scale", scale.toString());
     }
 
+    async function loadEventBackground() {
+      const fit = localStorage.getItem("luckydraw_background_fit") || "cover";
+      stage.style.backgroundSize = fit === "contain" ? "contain" : "cover";
+
+      try {
+        const record = await LuckyDrawBackground.get();
+        if (!record || !record.blob) return;
+        if (backgroundObjectUrl) URL.revokeObjectURL(backgroundObjectUrl);
+        backgroundObjectUrl = URL.createObjectURL(record.blob);
+        const image = new Image();
+        image.src = backgroundObjectUrl;
+        await image.decode();
+        stage.style.backgroundImage = `url(${JSON.stringify(backgroundObjectUrl)})`;
+      } catch {
+        stage.style.backgroundImage = "none";
+      }
+    }
+
     updateStageScale();
+    window.luckyDrawBackgroundReady = loadEventBackground();
     window.addEventListener("resize", updateStageScale);
     document.addEventListener("fullscreenchange", updateStageScale);
 
