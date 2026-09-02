@@ -7,6 +7,8 @@ const APP_SCHEME = "luckydraw";
 const APP_HOST = "app";
 const SELF_TEST = process.argv.includes("--self-test");
 const CAPTURE_DIR = process.env.LUCKYDRAW_CAPTURE_DIR;
+const ALWAYS_FULLSCREEN = !SELF_TEST;
+let isQuitting = false;
 
 if (SELF_TEST) {
   app.setPath("userData", path.join(os.tmpdir(), `luckydraw-self-test-${process.pid}`));
@@ -119,10 +121,23 @@ function configureWindowNavigation(window) {
   });
 
   window.webContents.on("before-input-event", (event, input) => {
-    if (input.type === "keyDown" && input.key === "F11") {
+    if (input.type !== "keyDown") return;
+
+    if (input.key === "Escape") {
       event.preventDefault();
-      window.setFullScreen(!window.isFullScreen());
+      isQuitting = true;
+      app.quit();
+      return;
     }
+
+    if (input.key === "F11") {
+      event.preventDefault();
+    }
+  });
+
+  window.on("leave-full-screen", () => {
+    if (!ALWAYS_FULLSCREEN || isQuitting) return;
+    window.setFullScreen(true);
   });
 }
 
@@ -287,6 +302,7 @@ function createWindow() {
     minWidth: 880,
     minHeight: 560,
     show: !SELF_TEST,
+    fullscreen: ALWAYS_FULLSCREEN,
     backgroundColor: "#000000",
     title: "럭키드로우",
     autoHideMenuBar: true,
@@ -311,6 +327,10 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("before-quit", () => {
+  isQuitting = true;
 });
 
 app.on("window-all-closed", () => {
