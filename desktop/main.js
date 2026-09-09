@@ -223,18 +223,32 @@ function installSelfTest(window) {
         }
 
         const layoutResults = [];
-        for (const [width, height] of [[1920, 1080], [3840, 2160], [5120, 1440]]) {
+        for (const [width, height] of [
+          [1280, 720],
+          [1920, 1080],
+          [2560, 1440],
+          [3440, 1440],
+          [3840, 2160],
+          [5120, 1440],
+          [1080, 1920]
+        ]) {
           window.setContentSize(width, height);
           await new Promise((resolve) => setTimeout(resolve, 120));
           layoutResults.push(await window.webContents.executeJavaScript(`
             (() => {
               const stageBounds = document.querySelector(".stage").getBoundingClientRect();
+              const confetti = document.getElementById("confettiLayer");
+              const confettiBounds = confetti.getBoundingClientRect();
               const digitsBounds = document.querySelector(".digits-wrapper").getBoundingClientRect();
               return {
                 viewportWidth: window.innerWidth,
                 viewportHeight: window.innerHeight,
                 stageWidth: stageBounds.width,
                 stageHeight: stageBounds.height,
+                confettiLeft: confettiBounds.left,
+                confettiTop: confettiBounds.top,
+                confettiWidth: confettiBounds.width,
+                confettiHeight: confettiBounds.height,
                 digitsLeft: digitsBounds.left,
                 digitsTop: digitsBounds.top,
                 digitsRight: digitsBounds.right,
@@ -247,6 +261,9 @@ function installSelfTest(window) {
         const result = await window.webContents.executeJavaScript(`
           (async () => {
             await window.luckyDrawBackgroundReady;
+            playConfetti();
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            const confettiCanvas = document.getElementById("confettiLayer");
             return ({
             numbers: JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]"),
             digitCount: document.querySelectorAll(".digit-box").length,
@@ -254,10 +271,19 @@ function installSelfTest(window) {
             backgroundImage: getComputedStyle(document.querySelector(".stage")).backgroundImage,
             stageWidth: document.querySelector(".stage").getBoundingClientRect().width,
             viewportWidth: window.innerWidth,
-            confettiType: typeof confetti
+            viewportHeight: window.innerHeight,
+            confettiType: typeof confetti,
+            confettiInstanceType: typeof fireConfetti,
+            confettiCanvasWidth: confettiCanvas.width,
+            confettiCanvasHeight: confettiCanvas.height
             });
           })()
         `);
+
+        if (CAPTURE_DIR) {
+          const image = await window.webContents.capturePage();
+          await fs.writeFile(path.join(CAPTURE_DIR, "confetti-ui.png"), image.toPNG());
+        }
 
         const passed =
           JSON.stringify(result.numbers) === JSON.stringify(["00012", "00014"]) &&
@@ -265,9 +291,16 @@ function installSelfTest(window) {
           result.background === "rgb(0, 0, 0)" &&
           result.backgroundImage !== "none" &&
           Math.abs(result.stageWidth - result.viewportWidth) < 1 &&
+          result.confettiInstanceType === "function" &&
+          Math.abs(result.confettiCanvasWidth - result.viewportWidth) < 1 &&
+          Math.abs(result.confettiCanvasHeight - result.viewportHeight) < 1 &&
           layoutResults.every((layout) =>
             Math.abs(layout.stageWidth - layout.viewportWidth) < 1 &&
             Math.abs(layout.stageHeight - layout.viewportHeight) < 1 &&
+            Math.abs(layout.confettiLeft) < 1 &&
+            Math.abs(layout.confettiTop) < 1 &&
+            Math.abs(layout.confettiWidth - layout.viewportWidth) < 1 &&
+            Math.abs(layout.confettiHeight - layout.viewportHeight) < 1 &&
             layout.digitsLeft >= 0 &&
             layout.digitsTop >= 0 &&
             layout.digitsRight <= layout.viewportWidth &&
@@ -284,7 +317,7 @@ function installSelfTest(window) {
         clearTimeout(timeout);
 
         if (!passed) throw new Error(`draw screen validation failed: ${JSON.stringify(result)}`);
-        process.stdout.write("SELF_TEST_OK: Downloads save, offline assets, range data, responsive stage, and local background loaded\n");
+        process.stdout.write("SELF_TEST_OK: Downloads save, offline assets, range data, responsive stage/confetti, and local background loaded\n");
         app.exit(0);
       }
     } catch (error) {

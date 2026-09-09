@@ -30,11 +30,12 @@
     html,
     body {
       margin: 0;
-      min-height: 100%;
+      width: 100%;
+      height: 100%;
     }
 
     body {
-      min-height: 100vh;
+      min-height: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -54,15 +55,24 @@
     }
 
     .stage {
-      position: relative;
+      position: fixed;
+      inset: 0;
       z-index: 1;
-      width: 100vw;
-      height: 100vh;
       overflow: hidden;
       background-color: #000;
       background-position: center;
       background-repeat: no-repeat;
       background-size: cover;
+    }
+
+    .confetti-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: block;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
     }
 
     .digits-wrapper {
@@ -174,9 +184,14 @@
       <div class="digit-box" id="d5"><span>0</span></div>
     </div>
   </div>
+  <canvas class="confetti-layer" id="confettiLayer" aria-hidden="true"></canvas>
 
   <script>
     const stage = document.querySelector(".stage");
+    const confettiLayer = document.getElementById("confettiLayer");
+    const fireConfetti = typeof confetti === "function"
+      ? confetti.create(confettiLayer, { resize: true, useWorker: true })
+      : null;
     const digitBoxes = [
       document.getElementById("d1"),
       document.getElementById("d2"),
@@ -229,12 +244,12 @@
     }
 
     function playConfetti() {
-      if (typeof confetti !== "function") return;
+      if (!fireConfetti) return;
 
       const defaults = { particleCount: 44, spread: 72, startVelocity: 28 };
-      confetti({ ...defaults, origin: { x: 0.18, y: 0.14 } });
-      confetti({ ...defaults, origin: { x: 0.5, y: 0.12 } });
-      confetti({ ...defaults, origin: { x: 0.82, y: 0.14 } });
+      fireConfetti({ ...defaults, origin: { x: 0.18, y: 0.14 } });
+      fireConfetti({ ...defaults, origin: { x: 0.5, y: 0.12 } });
+      fireConfetti({ ...defaults, origin: { x: 0.82, y: 0.14 } });
     }
 
     function clearRevealState() {
