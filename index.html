@@ -80,7 +80,7 @@
       left: 50%;
       top: calc(50% - (20px * var(--stage-scale)));
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, var(--digit-width)));
+      grid-template-columns: repeat(6, var(--digit-width));
       gap: var(--digit-gap);
       align-items: center;
       padding: 0;
@@ -177,11 +177,12 @@
 <body>
   <div class="stage">
     <div class="digits-wrapper" aria-label="추첨 번호">
-      <div class="digit-box" id="d1"><span>0</span></div>
-      <div class="digit-box" id="d2"><span>0</span></div>
-      <div class="digit-box" id="d3"><span>0</span></div>
-      <div class="digit-box" id="d4"><span>0</span></div>
-      <div class="digit-box" id="d5"><span>0</span></div>
+      <div class="digit-box"><span>0</span></div>
+      <div class="digit-box"><span>0</span></div>
+      <div class="digit-box"><span>0</span></div>
+      <div class="digit-box"><span>0</span></div>
+      <div class="digit-box"><span>0</span></div>
+      <div class="digit-box"><span>0</span></div>
     </div>
   </div>
   <canvas class="confetti-layer" id="confettiLayer" aria-hidden="true"></canvas>
@@ -192,14 +193,7 @@
     const fireConfetti = typeof confetti === "function"
       ? confetti.create(confettiLayer, { resize: true, useWorker: true })
       : null;
-    const digitBoxes = [
-      document.getElementById("d1"),
-      document.getElementById("d2"),
-      document.getElementById("d3"),
-      document.getElementById("d4"),
-      document.getElementById("d5")
-    ];
-
+    const digitBoxes = Array.from(document.querySelectorAll(".digit-box"));
     const digits = digitBoxes.map((box) => box.querySelector("span"));
     let backgroundObjectUrl = null;
 
@@ -233,7 +227,9 @@
     window.addEventListener("resize", updateStageScale);
     document.addEventListener("fullscreenchange", updateStageScale);
 
-    let numbers = JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]");
+    const numbers = JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]")
+      .filter((number) => typeof number === "string" && /^\d{5,6}$/.test(number))
+      .map((number) => number.padStart(6, "0"));
     if (numbers.length === 0) {
       alert("업로드된 참가자 데이터가 없습니다.\n업로드 페이지로 이동합니다.");
       location.href = "upload.html";
@@ -271,11 +267,10 @@
       if (isPlaying || numbers.length === 0) return;
 
       isPlaying = true;
-      clearRevealState();
-      document.body.classList.add("is-drawing");
-
       const index = Math.floor(Math.random() * numbers.length);
       const target = numbers[index];
+      clearRevealState();
+      document.body.classList.add("is-drawing");
 
       const spin = setInterval(() => {
         digits.forEach((digit) => {

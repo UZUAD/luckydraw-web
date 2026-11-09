@@ -190,23 +190,49 @@ function installSelfTest(window) {
             const start = document.getElementById("startNumber");
             const end = document.getElementById("endNumber");
             const excluded = document.getElementById("excludeNumbers");
-            start.value = "12";
-            end.value = "14";
-            excluded.value = "13";
+            start.value = "99999";
+            end.value = "100001";
+            excluded.value = "100000";
             start.dispatchEvent(new Event("input", { bubbles: true }));
             end.dispatchEvent(new Event("input", { bubbles: true }));
-            document.getElementById("submitButton").click();
-            return document.getElementById("feedbackModalMessage").textContent;
+            const submit = document.getElementById("submitButton");
+            submit.click();
+            const range = localStorage.getItem("luckydraw_numbers");
+
+            document.getElementById("excelTab").click();
+            const sheet = XLSX.utils.aoa_to_sheet([
+              ["연번", "사원번호"], [1], [], [2, 12345], [3, 12345],
+              [4, 123456], [5, "012346"], [6, 1234567], [7, "ABC123"]
+            ]);
+            sheet.B4.z = "000000";
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, sheet, "참가자");
+            const file = new File([XLSX.write(workbook, { bookType: "xlsx", type: "array" })], "self-test.xlsx");
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            document.getElementById("excelFile").files = transfer.files;
+            excluded.value = "012346";
+            const message = document.getElementById("feedbackModalMessage");
+            const uploadFinished = new Promise((resolve) => {
+              const observer = new MutationObserver(() => {
+                observer.disconnect();
+                resolve();
+              });
+              observer.observe(message, { childList: true });
+            });
+            submit.click();
+            await uploadFinished;
+            return { range, message: message.textContent };
           })()
         `);
 
-        if (result !== "2명의 참가자를 저장했습니다!") {
-          throw new Error(`range registration failed: ${result}`);
+        if (result.range !== JSON.stringify(["99999", "100001"]) || result.message !== "3명의 참가자를 저장했습니다!") {
+          throw new Error(`range or Excel registration failed: ${JSON.stringify(result)}`);
         }
 
         if (CAPTURE_DIR) {
           const image = await window.webContents.capturePage();
-          await fs.writeFile(path.join(CAPTURE_DIR, "range-ui.png"), image.toPNG());
+          await fs.writeFile(path.join(CAPTURE_DIR, "registration-ui.png"), image.toPNG());
         }
 
         stage = 1;
@@ -286,8 +312,8 @@ function installSelfTest(window) {
         }
 
         const passed =
-          JSON.stringify(result.numbers) === JSON.stringify(["00012", "00014"]) &&
-          result.digitCount === 5 &&
+          JSON.stringify(result.numbers) === JSON.stringify(["012345", "12345", "123456"]) &&
+          result.digitCount === 6 &&
           result.background === "rgb(0, 0, 0)" &&
           result.backgroundImage !== "none" &&
           Math.abs(result.stageWidth - result.viewportWidth) < 1 &&
@@ -308,6 +334,35 @@ function installSelfTest(window) {
           ) &&
           result.confettiType === "function";
 
+        if (!passed) throw new Error(`draw screen validation failed: ${JSON.stringify(result)}`);
+
+        const winners = await window.webContents.executeJavaScript(`
+          (async () => {
+            async function drawFirst() {
+              const random = Math.random;
+              try {
+                Math.random = () => 0;
+                document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+              } finally {
+                Math.random = random;
+              }
+              await new Promise((resolve) => {
+                const observer = new MutationObserver(() => {
+                  if (document.body.classList.contains("is-drawing")) return;
+                  observer.disconnect();
+                  resolve();
+                });
+                observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+              });
+              return document.querySelector(".digits-wrapper").textContent;
+            }
+            return [await drawFirst(), await drawFirst()];
+          })()
+        `);
+        if (JSON.stringify(winners) !== JSON.stringify(["012345", "12345"])) {
+          throw new Error(`winning number display failed: ${JSON.stringify(winners)}`);
+        }
+
         await window.webContents.executeJavaScript(
           `Promise.all([
             LuckyDrawBackground.remove(),
@@ -316,8 +371,7 @@ function installSelfTest(window) {
         );
         clearTimeout(timeout);
 
-        if (!passed) throw new Error(`draw screen validation failed: ${JSON.stringify(result)}`);
-        process.stdout.write("SELF_TEST_OK: Downloads save, offline assets, range data, responsive stage/confetti, and local background loaded\n");
+        process.stdout.write("SELF_TEST_OK: Downloads, offline assets, range and Excel registration, 5- and 6-digit draws, responsive layout, and local background\n");
         app.exit(0);
       }
     } catch (error) {
