@@ -201,7 +201,7 @@ function installSelfTest(window) {
 
             document.getElementById("excelTab").click();
             const sheet = XLSX.utils.aoa_to_sheet([
-              ["연번", "사원번호"], [1], [], [2, 12345], [3, 12345],
+              ["연번", "사원번호"], [1], [], [2, 12345], [3, 7],
               [4, 123456], [5, "012346"], [6, 1234567], [7, "ABC123"]
             ]);
             sheet.B4.z = "000000";
@@ -211,7 +211,7 @@ function installSelfTest(window) {
             const transfer = new DataTransfer();
             transfer.items.add(file);
             document.getElementById("excelFile").files = transfer.files;
-            excluded.value = "012346";
+            excluded.value = "12346";
             const message = document.getElementById("feedbackModalMessage");
             const uploadFinished = new Promise((resolve) => {
               const observer = new MutationObserver(() => {
@@ -226,7 +226,7 @@ function installSelfTest(window) {
           })()
         `);
 
-        if (result.range !== JSON.stringify(["99999", "100001"]) || result.message !== "3명의 참가자를 저장했습니다!") {
+        if (result.range !== JSON.stringify(["099999", "100001"]) || result.message !== "3명의 참가자를 저장했습니다!") {
           throw new Error(`range or Excel registration failed: ${JSON.stringify(result)}`);
         }
 
@@ -312,7 +312,7 @@ function installSelfTest(window) {
         }
 
         const passed =
-          JSON.stringify(result.numbers) === JSON.stringify(["012345", "12345", "123456"]) &&
+          JSON.stringify(result.numbers) === JSON.stringify(["012345", "000007", "123456"]) &&
           result.digitCount === 6 &&
           result.background === "rgb(0, 0, 0)" &&
           result.backgroundImage !== "none" &&
@@ -354,12 +354,12 @@ function installSelfTest(window) {
                 });
                 observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
               });
-              return document.querySelector(".digits-wrapper").textContent;
+              return Array.from(document.querySelectorAll(".digit-box span"), (digit) => digit.textContent).join("");
             }
             return [await drawFirst(), await drawFirst()];
           })()
         `);
-        if (JSON.stringify(winners) !== JSON.stringify(["012345", "12345"])) {
+        if (JSON.stringify(winners) !== JSON.stringify(["012345", "000007"])) {
           throw new Error(`winning number display failed: ${JSON.stringify(winners)}`);
         }
 
@@ -371,7 +371,7 @@ function installSelfTest(window) {
         );
         clearTimeout(timeout);
 
-        process.stdout.write("SELF_TEST_OK: Downloads, offline assets, range and Excel registration, 5- and 6-digit draws, responsive layout, and local background\n");
+        process.stdout.write("SELF_TEST_OK: Downloads, offline assets, six-digit registration and draws, responsive layout, and local background\n");
         app.exit(0);
       }
     } catch (error) {
