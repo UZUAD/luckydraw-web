@@ -356,6 +356,54 @@ async function testLiveSettings(window) {
   })()`);
 }
 
+async function testWinnerExport(window) {
+  async function download(trigger) {
+    let onDownload;
+    let timer;
+    const completed = new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error("winner export download timed out")), 10000);
+      onDownload = (_event, item) => item.once("done", (_doneEvent, state) => {
+        if (state === "completed") resolve(item.getSavePath());
+        else reject(new Error("winner export download failed: " + state));
+      });
+      session.defaultSession.once("will-download", onDownload);
+    });
+    try {
+      await window.webContents.executeJavaScript(trigger);
+      return await completed;
+    } finally {
+      clearTimeout(timer);
+      session.defaultSession.removeListener("will-download", onDownload);
+    }
+  }
+  const before = await window.webContents.executeJavaScript("localStorage.getItem(LuckyDrawStore.STATE_KEY)");
+  const firstPath = await download('exportButton.click()');
+  const firstBytes = await fs.readFile(firstPath);
+  await window.webContents.executeJavaScript('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", code: "Digit1" }))');
+  if (!firstBytes.equals(await fs.readFile(firstPath))) throw new Error("count shortcut changed the saved Excel file");
+  const secondPath = await download('document.dispatchEvent(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))');
+  if (path.basename(firstPath) !== "당첨자명단.xlsx" || path.basename(secondPath) !== "당첨자명단 (2).xlsx" ||
+      !firstBytes.equals(await fs.readFile(firstPath))) throw new Error("winner export overwrote an existing file");
+  const xlsx = require("../vendor/xlsx.full.min.js");
+  for (const filePath of [firstPath, secondPath]) {
+    const workbook = xlsx.read(await fs.readFile(filePath), { type: "buffer", cellDates: true });
+    const sheet = workbook.Sheets["당첨자명단"];
+    const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, blankrows: true, defval: null });
+    const expected = JSON.parse(before).history.flatMap((round) => round.winners);
+    const winners = rows.slice(1).filter((row) => row[0] !== null);
+    if (JSON.stringify(winners.map((row) => row[3])) !== JSON.stringify(expected) ||
+        winners.some((row, index) => row[0] !== index + 1) ||
+        rows.filter((row) => row.every((cell) => cell === null)).length !== 3) throw new Error("downloaded Excel lost winners or count-change separators");
+  }
+  const after = await window.webContents.executeJavaScript(`
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "3", code: "Numpad3" }));
+    stageStatus.hidden = true;
+    localStorage.getItem(LuckyDrawStore.STATE_KEY);
+  `);
+  if (before !== after) throw new Error("export or number shortcut changed winner history");
+  return { firstPath, firstBytes };
+}
+
 function installSelfTest(window) {
   let stage = 0;
   const timeout = setTimeout(() => {
@@ -567,6 +615,7 @@ function installSelfTest(window) {
 
         await testBatchDraw(window);
         const batchResult = await testLiveSettings(window);
+        const exported = await testWinnerExport(window);
         stage = 2;
         await new Promise((resolve) => {
           window.webContents.once("did-finish-load", resolve);
@@ -588,6 +637,18 @@ function installSelfTest(window) {
           throw new Error(`reload recovery failed: ${JSON.stringify(recovered)}`);
         }
 
+        stage = 3;
+        await window.loadURL(`${APP_SCHEME}://${APP_HOST}/upload.html`);
+        const reset = await window.webContents.executeJavaScript(`({
+          saved: LuckyDrawStore.create(localStorage).load(),
+          numbers: JSON.parse(localStorage.getItem("luckydraw_numbers")),
+          count: localStorage.getItem("luckydraw_count"),
+          pendingBreak: localStorage.getItem("luckydraw_export_break_after"),
+          noDrawSettings: !document.getElementById("drawSettingsTitle")
+        })`);
+        if (reset.saved.history.length || reset.saved.remaining.length || reset.numbers.length || reset.count !== "4" || reset.pendingBreak !== null || !reset.noDrawSettings ||
+            !exported.firstBytes.equals(await fs.readFile(exported.firstPath))) throw new Error("upload reentry did not start a new event or changed the exported archive");
+
         await window.webContents.executeJavaScript(
           `Promise.all([
             LuckyDrawBackground.remove(),
@@ -596,7 +657,7 @@ function installSelfTest(window) {
         );
         clearTimeout(timeout);
 
-        process.stdout.write("SELF_TEST_OK: registration, offline assets and backgrounds, 1–4 simultaneous winners, F2 settings and Escape close, preserved unique results, automatic visible history, responsive history placement, settings lock during animation, reentry guard, insufficient participants, and reload recovery\n");
+        process.stdout.write("SELF_TEST_OK: registration, offline assets and backgrounds, number-key 1–4 counts, F2 settings and Escape close, unique results, horizontal panels and bottom history, animation lock, reload recovery, actual Excel downloads with blank group separators and leading zeros, preserved Excel data on count change, and upload reentry resets the event\n");
         app.exit(0);
       }
     } catch (error) {

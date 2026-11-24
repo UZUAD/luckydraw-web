@@ -30,6 +30,21 @@ test("상품을 바꿔 연속 추첨해도 중복 당첨이 없고 이전 상품
   assert.deepEqual(state.remaining, participants.slice(8));
 });
 
+test("개수 변경 뒤의 구분선은 당첨 기록에 보존하고 중복 당첨을 막는다", () => {
+  const storage = memoryStorage();
+  const store = create(storage, () => 0);
+  store.register(participants);
+  store.draw(4, "키보드", { separateBefore: true });
+  store.draw(1, "마우스", { separateBefore: true });
+  store.draw(1, "마우스");
+  const state = create(storage).load();
+  assert.equal(state.history[0].separateBefore, undefined);
+  assert.equal(state.history[1].separateBefore, true);
+  assert.equal(state.history[2].separateBefore, undefined);
+  assert.equal(new Set(state.history.flatMap((round) => round.winners)).size, 6);
+  assert.deepEqual(state.remaining, participants.slice(6));
+});
+
 test("참가자가 부족하면 일부 인원만 뽑지 않고 상태를 보존한다", () => {
   const storage = memoryStorage();
   const store = create(storage);
