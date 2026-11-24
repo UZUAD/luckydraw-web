@@ -7,6 +7,7 @@
 
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="vendor/background-store.js"></script>
+  <script src="vendor/draw-store.js"></script>
 
   <style>
     :root {
@@ -855,6 +856,7 @@
 
         <div class="footer-note">
           등록하고 추첨 화면으로 이동 버튼을 누르면 참가자 번호가 저장되고, 바로 추첨 화면으로 이동합니다.
+          <br />이 업로드 화면을 다시 열면 새 행사로 시작하며 이전 당첨 명단이 초기화됩니다. 필요한 명단은 추첨 화면에서 엑셀로 저장해주세요.
         </div>
       </article>
     </section>
@@ -897,6 +899,19 @@
     let activeMode = "excel";
     let modalCloseHandler = null;
     let backgroundPreviewUrl = null;
+
+    function startNewEvent() {
+      try {
+        LuckyDrawStore.create(localStorage).register([]);
+        localStorage.setItem("luckydraw_count", "4");
+        localStorage.setItem("luckydraw_prize", "");
+        localStorage.removeItem("luckydraw_export_break_after");
+      } catch {
+        showFeedbackModal("새 행사를 시작할 수 없습니다. 저장 공간을 확인한 뒤 업로드 화면을 다시 열어주세요.");
+      }
+    }
+    startNewEvent();
+    window.addEventListener("pageshow", (event) => { if (event.persisted) startNewEvent(); });
 
     function formatFileSize(bytes) {
       if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
@@ -1115,7 +1130,8 @@
 
     function saveNumbersAndContinue(numbers) {
       try {
-        localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
+        numbers = LuckyDrawStore.normalizeNumbers(numbers);
+        LuckyDrawStore.create(localStorage).register(numbers);
       } catch {
         showFeedbackModal("참가자 번호를 저장할 수 없습니다. 등록할 번호 수를 줄인 뒤 다시 시도해주세요.");
         return;

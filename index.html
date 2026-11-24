@@ -4,125 +4,50 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>럭키드로우 — 추첨</title>
-
   <script src="vendor/confetti.browser.min.js"></script>
-  <script src="vendor/xlsx.full.min.js"></script>
   <script src="vendor/background-store.js"></script>
-
+  <script src="vendor/draw-store.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/winner-export.js"></script>
   <style>
     :root {
-      --text-main: #f7f7f7;
-      --digit-color: #ffffff;
-      --digit-reveal: #ffffff;
-      --stage-width: 2304px;
-      --stage-height: 640px;
       --stage-scale: 1;
       --digit-width: 112px;
       --digit-height: 136px;
       --digit-gap: 18px;
       --digit-font-size: 104px;
+      --horizontal-panel-gap: 192px;
+      --vertical-panel-gap: 72px;
+      --panel-gap: var(--horizontal-panel-gap);
     }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    body {
-      min-height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      position: relative;
-      font-family: "SUIT Variable", "Pretendard Variable", "Noto Sans KR", sans-serif;
-      color: var(--text-main);
-      background: #000;
-    }
-
-    body::before {
-      content: none;
-    }
-
-    body::after {
-      content: none;
-    }
-
-    .stage {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      overflow: hidden;
-      background-color: #000;
-      background-position: center;
-      background-repeat: no-repeat;
-      background-size: cover;
-    }
-
-    .confetti-layer {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      display: block;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    .digits-wrapper {
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; }
+    body { overflow: hidden; color: #fff; background: #000; }
+    .stage { position: fixed; inset: 0; z-index: 1; overflow: hidden; background: #000 center / cover no-repeat; }
+    .winner-grid {
       position: absolute;
       left: 50%;
       top: calc(50% - (20px * var(--stage-scale)));
       display: grid;
-      grid-template-columns: repeat(6, var(--digit-width));
-      gap: var(--digit-gap);
-      align-items: center;
-      padding: 0;
+      grid-template-columns: repeat(var(--columns, 4), max-content);
+      gap: var(--panel-gap);
       transform: translate(-50%, -50%) scale(var(--stage-scale));
       transform-origin: center;
-      justify-content: center;
     }
-
-    .digits-wrapper::before {
-      content: none;
-    }
-
-    .digits-wrapper::after {
-      content: none;
-    }
-
+    .digits-wrapper { display: grid; grid-template-columns: repeat(6, var(--digit-width)); gap: var(--digit-gap); }
     .digit-box {
       position: relative;
       width: var(--digit-width);
       height: var(--digit-height);
       display: grid;
       place-items: center;
-      border-radius: 16px;
+      border-radius: 14px;
       overflow: hidden;
-      background: rgba(0, 0, 0, 0.92);
-      border: 2px solid rgba(255, 255, 255, 0.86);
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
-      transition:
-        transform 240ms ease,
-        border-color 240ms ease,
-        box-shadow 240ms ease,
-        background 240ms ease;
+      background: rgba(0,0,0,.92);
+      border: 2px solid rgba(255,255,255,.86);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.08);
+      transition: border-color 240ms ease, box-shadow 240ms ease;
     }
-
-    .digit-box::before {
-      content: none;
-    }
-
-    .digit-box::after {
-      content: none;
-    }
-
     .digit-box span {
       position: absolute;
       inset: 50% auto auto 50%;
@@ -134,201 +59,375 @@
       font-size: var(--digit-font-size);
       font-family: "Arial Black", "Helvetica Neue", sans-serif;
       font-weight: 900;
-      line-height: 0.88;
-      letter-spacing: -0.03em;
+      line-height: .88;
+      letter-spacing: -.03em;
       text-align: center;
       transform: translate(-50%, -52%);
-      color: var(--digit-color);
-      text-shadow: none;
-      transition:
-        transform 240ms ease,
-        color 240ms ease,
-        text-shadow 240ms ease;
+      color: #fff;
     }
-
-    body.is-drawing .digit-box {
-      background: rgba(0, 0, 0, 0.92);
-      border-color: rgba(255, 255, 255, 0.95);
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+    body.is-drawing .digit-box { border-color: rgba(255,255,255,.95); }
+    .digit-box.reveal { border-color: rgba(255,255,255,.98); box-shadow: 0 0 0 1px rgba(255,255,255,.16); }
+    .confetti-layer { position: fixed; inset: 0; z-index: 100; display: block; width: 100%; height: 100%; pointer-events: none; }
+    [hidden] { display: none !important; }
+    body { font-family: "Helvetica Neue", Arial, sans-serif; }
+    .history-panel {
+      position: fixed;
+      z-index: 2;
+      left: 3vw;
+      right: 3vw;
+      bottom: max(12px, 2vh);
+      height: clamp(128px, 25vh, 220px);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 20px;
+      border: 1px solid rgba(255,255,255,.24);
+      border-radius: 16px;
+      background: rgba(0,0,0,.88);
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
     }
-
-    body.is-drawing .digit-box span {
-      color: #ffffff;
-    }
-
-    .digit-box.reveal {
-      background: rgba(0, 0, 0, 0.92);
-      border-color: rgba(255, 255, 255, 0.98);
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
-    }
-
-    .digit-box.reveal span {
-      color: var(--digit-reveal);
-      transform: translate(-50%, -52%) scale(1.01);
-      text-shadow: none;
-    }
-
-    .digit-box {
-      border-radius: 14px;
-    }
+    .history-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; }
+    .history-heading h2 { margin: 0; font-size: 1rem; font-weight: 700; }
+    .history-total { margin-left: auto; font-size: .875rem; color: #d4d4d4; }
+    .export-button { padding: 6px 12px; border: 1px solid #777; border-radius: 6px; color: #fff; background: #262626; font: inherit; font-size: .875rem; cursor: pointer; }
+    .export-button:disabled { opacity: .45; cursor: default; }
+    .history-list { display: flex; gap: 24px; min-height: 0; margin: 0; padding: 0 0 4px; overflow: auto; list-style: none; }
+    .history-round { flex: 0 0 auto; min-width: 160px; }
+    .history-round-title { margin-bottom: 8px; font-size: .875rem; color: #d4d4d4; overflow-wrap: anywhere; }
+    .history-numbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+    .history-number { font-size: clamp(1rem, 1.4vw, 1.5rem); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+    .stage-status { position: fixed; left: 50%; top: 24px; z-index: 110; max-width: calc(100vw - 32px); padding: 14px 20px; border: 1px solid #777; border-radius: 10px; background: #171717; font-size: 1rem; text-align: center; transform: translateX(-50%); }
+    .settings-dialog { width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 28px; overflow: auto; border: 1px solid #555; border-radius: 20px; color: #fff; background: #181818; box-shadow: 0 24px 80px rgba(0,0,0,.5); }
+    .settings-dialog::backdrop { background: rgba(0,0,0,.72); }
+    .settings-dialog h2 { margin: 0 0 8px; font-size: 1.5rem; }
+    .settings-description { margin: 0 0 24px; color: #c6c6c6; font-size: .875rem; line-height: 1.6; }
+    .settings-field { display: grid; gap: 8px; margin-bottom: 18px; font-size: 1rem; }
+    .settings-field input, .settings-field select { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #666; border-radius: 8px; color: #fff; background: #262626; font: inherit; color-scheme: dark; }
+    .settings-field select { appearance: none; padding-right: 38px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+    .settings-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .settings-actions button { flex: 1; min-height: 46px; padding: 10px 14px; border: 1px solid #666; border-radius: 8px; background: #282828; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+    .settings-actions button[type="submit"] { border-color: #fff; color: #111; background: #fff; }
+    .settings-error { color: #ffb9b9; font-size: .875rem; line-height: 1.6; }
+    :focus-visible { outline: 3px solid #9acbff; outline-offset: 3px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
 </head>
-
 <body>
-  <div class="stage">
-    <div class="digits-wrapper" aria-label="추첨 번호">
-      <div class="digit-box"><span>0</span></div>
-      <div class="digit-box"><span>0</span></div>
-      <div class="digit-box"><span>0</span></div>
-      <div class="digit-box"><span>0</span></div>
-      <div class="digit-box"><span>0</span></div>
-      <div class="digit-box"><span>0</span></div>
-    </div>
-  </div>
+  <div class="stage"><div class="winner-grid" id="winnerGrid" aria-label="추첨 번호" aria-busy="false"></div></div>
+  <aside class="history-panel" id="historyPanel" data-position="bottom" aria-label="누적 당첨 기록" hidden>
+    <div class="history-heading"><h2>당첨자 명단</h2><span class="history-total" id="historyTotal" aria-live="polite"></span><button class="export-button" id="exportWinners" type="button" aria-keyshortcuts="Control+S Meta+S">엑셀 저장</button></div>
+    <ol class="history-list" id="historyList"></ol>
+  </aside>
+  <div class="stage-status" id="stageStatus" role="status" hidden></div>
+  <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle" aria-describedby="settingsDescription" aria-keyshortcuts="F2">
+    <form id="settingsForm">
+      <h2 id="settingsTitle">추첨 설정</h2>
+      <p class="settings-description" id="settingsDescription">숫자키 1·2·3·4로 번호판 개수를 바로 바꿀 수 있습니다. 기존 당첨 기록과 중복 당첨 방지는 유지됩니다.</p>
+      <label class="settings-field">동시에 돌릴 번호판
+        <select id="settingsCount" autofocus><option value="1">1개 · 1명 추첨</option><option value="2">2개 · 2명 동시 추첨</option><option value="3">3개 · 3명 동시 추첨</option><option value="4">4개 · 4명 동시 추첨</option></select>
+      </label>
+      <label class="settings-field">이번 추첨 상품명 (선택)
+        <input id="settingsPrize" type="text" maxlength="80" placeholder="예: 무선 마우스" />
+      </label>
+      <p class="settings-description" id="settingsRemaining"></p>
+      <p class="settings-error" id="settingsError" role="alert" hidden></p>
+      <div class="settings-actions"><button id="closeSettings" type="button">닫기</button><button type="submit">적용</button></div>
+    </form>
+  </dialog>
   <canvas class="confetti-layer" id="confettiLayer" aria-hidden="true"></canvas>
-
   <script>
     const stage = document.querySelector(".stage");
+    const grid = document.getElementById("winnerGrid");
+    const historyPanel = document.getElementById("historyPanel");
+    const historyList = document.getElementById("historyList");
+    const settingsDialog = document.getElementById("settingsDialog");
+    const settingsCount = document.getElementById("settingsCount");
+    const settingsPrize = document.getElementById("settingsPrize");
+    const exportButton = document.getElementById("exportWinners");
+    const settingsError = document.getElementById("settingsError");
+    const stageStatus = document.getElementById("stageStatus");
     const confettiLayer = document.getElementById("confettiLayer");
-    const fireConfetti = typeof confetti === "function"
-      ? confetti.create(confettiLayer, { resize: true, useWorker: true })
-      : null;
-    const digitBoxes = Array.from(document.querySelectorAll(".digit-box"));
-    const digits = digitBoxes.map((box) => box.querySelector("span"));
+    const fireConfetti = typeof confetti === "function" ? confetti.create(confettiLayer, { resize: true, useWorker: true }) : null;
+    const store = LuckyDrawStore.create(localStorage);
+    const savedCount = Number(localStorage.getItem("luckydraw_count"));
+    let drawCount = [1, 2, 3, 4].includes(savedCount) ? savedCount : 4;
+    const drawLayout = "horizontal";
+    let prizeName = localStorage.getItem("luckydraw_prize") || "럭키드로우";
+    let state;
+    let isPlaying = false;
     let backgroundObjectUrl = null;
+    let statusTimeout;
 
     function updateStageScale() {
-      const baseWidth = 2304;
-      const baseHeight = 640;
-      const scale = Math.min(window.innerWidth / baseWidth, window.innerHeight / baseHeight);
-      stage.style.setProperty("--stage-scale", scale.toString());
+      const count = Number(grid.dataset.count) || drawCount;
+      const historyBounds = historyPanel.getBoundingClientRect();
+      const contentBottom = historyPanel.hidden ? innerHeight : historyBounds.top - 24;
+      const styles = getComputedStyle(stage);
+      const digitGap = parseFloat(styles.getPropertyValue("--digit-gap"));
+      const panelGap = parseFloat(styles.getPropertyValue("--horizontal-panel-gap"));
+      const panelWidth = 6 * 112 + 5 * digitGap;
+      const width = count * panelWidth + (count - 1) * panelGap;
+      const height = 136;
+      const scale = count === 1
+        ? Math.min(innerWidth / 2304, contentBottom / 640)
+        : Math.min(innerWidth * .86 / width, contentBottom * .44 / height);
+      stage.style.setProperty("--stage-scale", String(scale));
+      grid.style.setProperty("--columns", String(count));
+      grid.style.setProperty("--panel-gap", `${panelGap}px`);
+      const preferredCenter = count === 1 ? innerHeight * .5 - 20 * scale : innerHeight * .56;
+      const center = Math.max(height * scale / 2 + 8, Math.min(preferredCenter, contentBottom - height * scale / 2 - 16));
+      grid.style.top = `${center}px`;
+      grid.dataset.layout = drawLayout;
     }
 
     async function loadEventBackground() {
-      const fit = localStorage.getItem("luckydraw_background_fit") || "cover";
-      stage.style.backgroundSize = fit === "contain" ? "contain" : "cover";
-
+      stage.style.backgroundSize = localStorage.getItem("luckydraw_background_fit") === "contain" ? "contain" : "cover";
       try {
         const record = await LuckyDrawBackground.get();
         if (!record || !record.blob) return;
         if (backgroundObjectUrl) URL.revokeObjectURL(backgroundObjectUrl);
         backgroundObjectUrl = URL.createObjectURL(record.blob);
-        const image = new Image();
-        image.src = backgroundObjectUrl;
-        await image.decode();
         stage.style.backgroundImage = `url(${JSON.stringify(backgroundObjectUrl)})`;
-      } catch {
-        stage.style.backgroundImage = "none";
-      }
+        updateStageScale();
+      } catch { stage.style.backgroundImage = "none"; }
     }
-
-    updateStageScale();
     window.luckyDrawBackgroundReady = loadEventBackground();
     window.addEventListener("resize", updateStageScale);
     document.addEventListener("fullscreenchange", updateStageScale);
+    window.addEventListener("pagehide", () => { if (backgroundObjectUrl) URL.revokeObjectURL(backgroundObjectUrl); });
 
-    const numbers = JSON.parse(localStorage.getItem("luckydraw_numbers") || "[]")
-      .filter((number) => typeof number === "string" && /^\d{5,6}$/.test(number))
-      .map((number) => number.padStart(6, "0"));
-    if (numbers.length === 0) {
-      alert("업로드된 참가자 데이터가 없습니다.\n업로드 페이지로 이동합니다.");
-      location.href = "upload.html";
+    function renderCards(count, winners = []) {
+      grid.replaceChildren();
+      grid.dataset.count = String(count);
+      for (let index = 0; index < count; index++) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "digits-wrapper";
+        wrapper.setAttribute("role", "img");
+        wrapper.setAttribute("aria-label", winners[index] ? `당첨 사번 ${winners[index]}` : "추첨 대기");
+        [...(winners[index] || "000000")].forEach((digit) => {
+          const box = document.createElement("div");
+          box.className = `digit-box${winners[index] ? " reveal" : ""}`;
+          const span = document.createElement("span");
+          span.textContent = digit;
+          span.setAttribute("aria-hidden", "true");
+          box.append(span);
+          wrapper.append(box);
+        });
+        grid.append(wrapper);
+      }
+      updateStageScale();
     }
 
-    function randomDigit() {
-      return Math.floor(Math.random() * 10);
+    function renderHistory() {
+      const history = state?.history || [];
+      const fragment = document.createDocumentFragment();
+      let total = 0;
+      for (const round of [...history].reverse()) {
+        const item = document.createElement("li");
+        item.className = "history-round";
+        const title = document.createElement("div");
+        title.className = "history-round-title";
+        title.textContent = `${round.round}회 · ${round.prize}`;
+        const numbers = document.createElement("div");
+        numbers.className = "history-numbers";
+        for (const winner of round.winners) {
+          const number = document.createElement("span");
+          number.className = "history-number";
+          number.textContent = winner;
+          numbers.append(number);
+          total++;
+        }
+        item.append(title, numbers);
+        fragment.append(item);
+      }
+      historyList.replaceChildren(fragment);
+      document.getElementById("historyTotal").textContent = `총 ${total}명`;
+      historyPanel.hidden = history.length === 0;
+      historyList.scrollTop = 0;
+      historyList.scrollLeft = 0;
+      exportButton.disabled = isPlaying || total === 0;
+      updateStageScale();
     }
+
+    function savePreferences(entries) {
+      const previous = entries.map(([key]) => [key, localStorage.getItem(key)]);
+      try {
+        for (const [key, value] of entries) localStorage.setItem(key, value);
+      } catch (error) {
+        for (const [key, value] of previous) {
+          try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* 가능한 설정은 이전 값으로 복구한다. */ }
+        }
+        throw error;
+      }
+    }
+
+    function countPreferences(count) {
+      const entries = [["luckydraw_count", String(count)]];
+      if (count !== drawCount && state?.history.length) entries.push(["luckydraw_export_break_after", String(state.history.length)]);
+      return entries;
+    }
+
+    function setDrawCount(count) {
+      if (![1, 2, 3, 4].includes(count) || settingsDialog.open) return;
+      if (isPlaying) { showStageStatus("추첨이 끝난 뒤 번호판 개수를 바꿀 수 있습니다."); return; }
+      if (count === drawCount) return;
+      try { savePreferences(countPreferences(count)); } catch {
+        showStageStatus("번호판 개수를 저장하지 못했습니다. 저장 공간을 확인해주세요.");
+        return;
+      }
+      drawCount = count;
+      const lastRound = state?.history.at(-1);
+      renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
+      showStageStatus(`${count}개 동시 추첨으로 변경했습니다.`);
+    }
+
+    function exportWinners() {
+      if (isPlaying) { showStageStatus("추첨이 끝난 뒤 당첨자명단을 저장해주세요."); return; }
+      try {
+        const saved = store.load();
+        const workbook = LuckyDrawExport.createWorkbook(saved.history, XLSX);
+        XLSX.writeFile(workbook, LuckyDrawExport.FILE_NAME, { compression: true });
+        showStageStatus("당첨자명단.xlsx 저장을 시작했습니다.");
+      } catch (error) {
+        showStageStatus(error.message || "당첨자명단을 저장하지 못했습니다.");
+      }
+    }
+    exportButton.addEventListener("click", exportWinners);
+
+    function showStageStatus(message) {
+      clearTimeout(statusTimeout);
+      stageStatus.textContent = message;
+      stageStatus.hidden = false;
+      statusTimeout = setTimeout(() => { stageStatus.hidden = true; }, 5000);
+    }
+
+    function toggleSettings() {
+      if (isPlaying) {
+        showStageStatus("추첨 중에는 설정을 변경할 수 없습니다. 추첨이 끝난 뒤 F2를 눌러주세요.");
+        return;
+      }
+      if (settingsDialog.open) { settingsDialog.close(); return; }
+      settingsCount.value = String(drawCount);
+      settingsPrize.value = prizeName === "럭키드로우" ? "" : prizeName;
+      document.getElementById("settingsRemaining").textContent = `남은 참가자 ${state?.remaining.length || 0}명 · Enter 키로 추첨 시작`;
+      settingsError.hidden = true;
+      stageStatus.hidden = true;
+      settingsDialog.showModal();
+    }
+
+    document.getElementById("closeSettings").addEventListener("click", () => settingsDialog.close());
+    document.getElementById("settingsForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (isPlaying || !settingsDialog.open) return;
+      const count = Number(settingsCount.value);
+      if (![1, 2, 3, 4].includes(count)) return;
+      const prize = settingsPrize.value.trim().slice(0, 80);
+      try {
+        savePreferences([...countPreferences(count), ["luckydraw_prize", prize]]);
+      } catch {
+        settingsError.textContent = "설정을 저장할 수 없습니다. 저장 공간을 확인한 뒤 다시 시도해주세요.";
+        settingsError.hidden = false;
+        return;
+      }
+      drawCount = count;
+      prizeName = prize || "럭키드로우";
+      const lastRound = state?.history.at(-1);
+      renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
+      updateStageScale();
+      settingsDialog.close();
+    });
 
     function playConfetti() {
-      if (!fireConfetti) return;
-
-      const defaults = { particleCount: 44, spread: 72, startVelocity: 28 };
-      fireConfetti({ ...defaults, origin: { x: 0.18, y: 0.14 } });
-      fireConfetti({ ...defaults, origin: { x: 0.5, y: 0.12 } });
-      fireConfetti({ ...defaults, origin: { x: 0.82, y: 0.14 } });
+      if (!fireConfetti || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      [0.18, 0.5, 0.82].forEach((x) => fireConfetti({ particleCount: 44, spread: 72, startVelocity: 28, origin: { x, y: .14 } }));
     }
+    function wait(milliseconds) { return new Promise((resolve) => setTimeout(resolve, milliseconds)); }
 
-    function clearRevealState() {
-      digitBoxes.forEach((box) => box.classList.remove("reveal"));
-    }
-
-    function revealTarget(target) {
-      [...target].forEach((n, i) => {
-        setTimeout(() => {
-          digits[i].textContent = n;
-          digitBoxes[i].classList.add("reveal");
-        }, i * 120);
-      });
-    }
-
-    let isPlaying = false;
-
-    function startDraw() {
-      if (isPlaying || numbers.length === 0) return;
-
+    async function startDraw() {
+      if (isPlaying || settingsDialog.open || !state) return;
+      if (state.remaining.length < drawCount) {
+        showStageStatus(`남은 참가자는 ${state.remaining.length}명입니다. F2 설정에서 추첨 개수를 줄여주세요.`);
+        return;
+      }
+      let result;
+      const separateBefore = state.history.length > 0 && Number(localStorage.getItem("luckydraw_export_break_after")) === state.history.length;
+      try { result = store.draw(drawCount, prizeName, { separateBefore }); } catch {
+        alert("추첨 결과를 저장할 수 없어 시작하지 않았습니다. 저장 공간을 확인해주세요.");
+        return;
+      }
+      state = result.state;
       isPlaying = true;
-      const index = Math.floor(Math.random() * numbers.length);
-      const target = numbers[index];
-      clearRevealState();
+      exportButton.disabled = true;
+      stageStatus.hidden = true;
+      const count = result.round.winners.length;
+      renderCards(count);
       document.body.classList.add("is-drawing");
-
-      const spin = setInterval(() => {
-        digits.forEach((digit) => {
-          digit.textContent = randomDigit();
+      grid.setAttribute("aria-busy", "true");
+      const spans = [...grid.querySelectorAll(".digit-box span")];
+      const shuffle = () => spans.forEach((digit) => { digit.textContent = Math.floor(Math.random() * 10); });
+      shuffle();
+      const spin = setInterval(shuffle, 72);
+      await wait(matchMedia("(prefers-reduced-motion: reduce)").matches ? 350 : 3600);
+      clearInterval(spin);
+      // 네 사번의 같은 자릿수를 함께 공개한다.
+      const panels = [...grid.querySelectorAll(".digits-wrapper")];
+      for (let digit = 0; digit < 6; digit++) {
+        panels.forEach((panel, index) => {
+          const box = panel.querySelectorAll(".digit-box")[digit];
+          box.querySelector("span").textContent = result.round.winners[index][digit];
+          box.classList.add("reveal");
         });
-      }, 72);
-
-      setTimeout(() => {
-        clearInterval(spin);
-        revealTarget(target);
-
-        numbers.splice(index, 1);
-        localStorage.setItem("luckydraw_numbers", JSON.stringify(numbers));
-
-        setTimeout(() => {
-          playConfetti();
-          document.body.classList.remove("is-drawing");
-          isPlaying = false;
-        }, 860);
-      }, 3600);
+        await wait(100);
+      }
+      renderCards(count, result.round.winners);
+      renderHistory();
+      document.body.classList.remove("is-drawing");
+      grid.setAttribute("aria-busy", "false");
+      isPlaying = false;
+      exportButton.disabled = false;
+      playConfetti();
     }
 
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") startDraw();
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "F2" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        event.preventDefault();
+        if (!event.repeat && !event.isComposing) toggleSettings();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (!event.repeat && !event.altKey && !isPlaying) exportWinners();
+        return;
+      }
+      if (settingsDialog.open || event.target.closest?.("input, select, textarea, [contenteditable='true']")) return;
+      if (/^[1-4]$/.test(event.key) && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        event.preventDefault();
+        if (!event.repeat && !event.isComposing) setDrawCount(Number(event.key));
+        return;
+      }
+      if (event.target.closest?.("button")) return;
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      if (event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      startDraw();
     });
-  </script>
-
-  <script>
-    // 테스트용 시뮬레이션(현재 사용 x)
-    async function simulateDraw(count = 500) {
-      const results = [];
-      let executed = 0;
-
-      function wait(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-      }
-
-      while (executed < count && numbers.length > 0) {
-        startDraw();
-        executed++;
-
-        await wait(4700);
-
-        const picked = digits.map((digit) => digit.textContent).join("");
-        results.push({
-          order: executed,
-          winner: picked
-        });
-      }
-
-      console.log("시뮬레이션 결과", results);
-
-      const ws = XLSX.utils.json_to_sheet(results);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Simulation");
-      XLSX.writeFile(wb, "luckydraw_real_simulation.xlsx");
-
-      alert("시뮬레이션 완료");
+    window.addEventListener("storage", (event) => {
+      if (event.key !== LuckyDrawStore.STATE_KEY || isPlaying) return;
+      try {
+        state = store.load();
+        const lastRound = state.history.at(-1);
+        renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
+        renderHistory();
+      } catch { /* 기존 화면을 유지한다. */ }
+    });
+    try {
+      state = store.load();
+      if (!state.remaining.length && !state.history.length) location.replace("upload.html");
+      const lastRound = state.history.at(-1);
+      renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
+      renderHistory();
+    } catch {
+      alert("저장된 추첨 데이터를 불러오지 못했습니다. 참가자를 다시 등록해주세요.");
+      location.replace("upload.html");
     }
   </script>
 </body>

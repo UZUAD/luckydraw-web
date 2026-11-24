@@ -5,3 +5,4 @@ dist/
 dist-electron/
 windows/bin/
 windows/obj/
+outputs/luckydraw-demo/

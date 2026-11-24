@@ -5,6 +5,7 @@
   "description": "Offline lucky draw desktop app with identical UI on macOS and Windows",
   "main": "desktop/main.js",
   "scripts": {
+    "test": "node --test tests/*.test.cjs",
     "start": "electron .",
     "self-test": "electron . --self-test",
     "build:mac": "./build-macos-app.sh",
