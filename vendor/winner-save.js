@@ -13,6 +13,17 @@
       return id;
     }
 
+    function eventFileName() {
+      let number = Number(storage.getItem("luckydraw_event_file_number"));
+      if (!Number.isSafeInteger(number) || number < 1) {
+        const previous = Number(storage.getItem("luckydraw_file_sequence")) || 0;
+        number = previous + 1;
+        storage.setItem("luckydraw_file_sequence", String(number));
+        storage.setItem("luckydraw_event_file_number", String(number));
+      }
+      return exporter.eventFileName(number);
+    }
+
     async function handleTransaction(mode, operation) {
       return new Promise((resolve, reject) => {
         const opened = environment.indexedDB.open("luckydraw_exports", 1);
@@ -36,19 +47,24 @@
       return handle;
     }
 
-    async function prepare() {
+    async function prepare({ persist = false } = {}) {
       if (desktop || typeof environment.showSaveFilePicker !== "function") return true;
       const id = eventId();
       const existing = await existingHandle(id);
       if (existing && await existing.queryPermission({ mode: "readwrite" }) === "granted") return true;
       try {
         const handle = await environment.showSaveFilePicker({
-          suggestedName: exporter.FILE_NAME,
+          suggestedName: eventFileName(),
           startIn: "desktop",
           types: [{ description: "당첨자명단 엑셀", accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] } }]
         });
         handles.set(id, handle);
-        try { await handleTransaction("readwrite", (store) => store.put(handle, id)); } catch { /* 현재 화면에서는 선택한 위치로 계속 저장한다. */ }
+        try { await handleTransaction("readwrite", (store) => store.put(handle, id)); } catch {
+          if (persist) {
+            handles.delete(id);
+            throw new Error("자동 저장 위치를 기억하지 못했습니다. 브라우저의 사이트 저장 공간을 확인한 뒤 다시 선택해주세요.");
+          }
+        }
         return true;
       } catch (error) {
         if (error.name === "AbortError") return false;
@@ -78,8 +94,9 @@
             catch (error) { try { await writable.abort(); } catch { /* 기존 파일은 유지한다. */ } throw error; }
             result = { fileName: handle.name };
           } else {
-            xlsx.writeFile(workbook, exporter.FILE_NAME, { compression: true });
-            result = { fileName: exporter.FILE_NAME, downloaded: true };
+            const fileName = eventFileName();
+            xlsx.writeFile(workbook, fileName, { compression: true });
+            result = { fileName, downloaded: true };
           }
         }
         lastSaved = signature;
@@ -91,6 +108,7 @@
 
     function newEvent() {
       storage.setItem("luckydraw_event_id", environment.crypto.randomUUID());
+      storage.setItem("luckydraw_event_file_number", "");
       lastSaved = "";
     }
 

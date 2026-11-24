@@ -1,6 +1,10 @@
 (function (root) {
   "use strict";
   const FILE_NAME = "당첨자명단.xlsx";
+  function eventFileName(number) {
+    if (!Number.isSafeInteger(number) || number < 1) throw new Error("올바른 행사 파일 번호가 필요합니다.");
+    return `당첨자명단_${number}.xlsx`;
+  }
 
   function createWorkbook(history, xlsx) {
     if (!history.length) throw new Error("아직 저장할 당첨자가 없습니다.");
@@ -22,7 +26,7 @@
     return workbook;
   }
 
-  const api = { FILE_NAME, createWorkbook };
+  const api = { FILE_NAME, eventFileName, createWorkbook };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LuckyDrawExport = api;
 })(globalThis);

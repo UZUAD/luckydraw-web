@@ -158,7 +158,6 @@
     let prizeName = localStorage.getItem("luckydraw_prize") || "럭키드로우";
     let state;
     let isPlaying = false;
-    let isPreparingDraw = false;
     let backgroundObjectUrl = null;
     let statusTimeout;
 
@@ -273,7 +272,7 @@
 
     function setDrawCount(count) {
       if (![1, 2, 3, 4].includes(count) || settingsDialog.open) return;
-      if (isPlaying || isPreparingDraw) { showStageStatus("추첨이 끝난 뒤 번호판 개수를 바꿀 수 있습니다."); return; }
+      if (isPlaying) { showStageStatus("추첨이 끝난 뒤 번호판 개수를 바꿀 수 있습니다."); return; }
       if (count === drawCount) return;
       try { savePreferences(countPreferences(count)); } catch {
         showStageStatus("번호판 개수를 저장하지 못했습니다. 저장 공간을 확인해주세요.");
@@ -316,6 +315,12 @@
       }
     }
     window.finalizeWinnerSave = () => saveAutomaticWinners({ force: true });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden" && location.protocol !== "luckydraw:") void saveAutomaticWinners();
+    });
+    window.addEventListener("pagehide", () => {
+      if (location.protocol !== "luckydraw:") void saveAutomaticWinners();
+    });
 
     function showStageStatus(message) {
       clearTimeout(statusTimeout);
@@ -325,7 +330,7 @@
     }
 
     function toggleSettings() {
-      if (isPlaying || isPreparingDraw) {
+      if (isPlaying) {
         showStageStatus("추첨 중에는 설정을 변경할 수 없습니다. 추첨이 끝난 뒤 F2를 눌러주세요.");
         return;
       }
@@ -341,7 +346,7 @@
     document.getElementById("closeSettings").addEventListener("click", () => settingsDialog.close());
     document.getElementById("settingsForm").addEventListener("submit", (event) => {
       event.preventDefault();
-      if (isPlaying || isPreparingDraw || !settingsDialog.open) return;
+      if (isPlaying || !settingsDialog.open) return;
       const count = Number(settingsCount.value);
       if (![1, 2, 3, 4].includes(count)) return;
       const prize = settingsPrize.value.trim().slice(0, 80);
@@ -367,24 +372,10 @@
     function wait(milliseconds) { return new Promise((resolve) => setTimeout(resolve, milliseconds)); }
 
     async function startDraw() {
-      if (isPlaying || isPreparingDraw || settingsDialog.open || !state) return;
+      if (isPlaying || settingsDialog.open || !state) return;
       if (state.remaining.length < drawCount) {
         showStageStatus(`남은 참가자는 ${state.remaining.length}명입니다. F2 설정에서 추첨 개수를 줄여주세요.`);
         return;
-      }
-      if (location.protocol !== "luckydraw:") {
-        isPreparingDraw = true;
-        try {
-          if (!await winnerSaver.prepare()) {
-            showStageStatus("엑셀 저장 위치를 선택한 뒤 추첨을 시작해주세요.");
-            return;
-          }
-        } catch (error) {
-          showStageStatus(error.message || "엑셀 저장 위치를 선택하지 못했습니다.");
-          return;
-        } finally {
-          isPreparingDraw = false;
-        }
       }
       let result;
       const separateBefore = state.history.length > 0 && Number(localStorage.getItem("luckydraw_export_break_after")) === state.history.length;
@@ -443,7 +434,6 @@
         if (!event.repeat && !event.isComposing) setDrawCount(Number(event.key));
         return;
       }
-      if (event.target.closest?.("button")) return;
       if (event.key !== "Enter") return;
       event.preventDefault();
       if (event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
