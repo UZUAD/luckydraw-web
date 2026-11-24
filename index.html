@@ -7,9 +7,6 @@
   <script src="vendor/confetti.browser.min.js"></script>
   <script src="vendor/background-store.js"></script>
   <script src="vendor/draw-store.js"></script>
-  <script src="vendor/xlsx.full.min.js"></script>
-  <script src="vendor/winner-export.js"></script>
-  <script src="vendor/winner-save.js"></script>
   <style>
     :root {
       --stage-scale: 1;
@@ -70,33 +67,6 @@
     .confetti-layer { position: fixed; inset: 0; z-index: 100; display: block; width: 100%; height: 100%; pointer-events: none; }
     [hidden] { display: none !important; }
     body { font-family: "Helvetica Neue", Arial, sans-serif; }
-    .history-panel {
-      position: fixed;
-      z-index: 2;
-      left: 3vw;
-      right: 3vw;
-      bottom: max(12px, 2vh);
-      height: clamp(128px, 25vh, 220px);
-      display: flex;
-      flex-direction: column;
-      padding: 16px 20px;
-      border: 1px solid rgba(255,255,255,.24);
-      border-radius: 16px;
-      background: rgba(0,0,0,.88);
-      box-shadow: 0 8px 32px rgba(0,0,0,.2);
-    }
-    .history-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; }
-    .history-heading h2 { margin: 0; font-size: 1rem; font-weight: 700; }
-    .history-total { margin-left: auto; font-size: .875rem; color: #d4d4d4; }
-    .save-status { font-size: .875rem; color: #d4d4d4; }
-    .save-status[data-state="error"] { color: #ffb9b9; }
-    .export-button { padding: 6px 12px; border: 1px solid #777; border-radius: 6px; color: #fff; background: #262626; font: inherit; font-size: .875rem; cursor: pointer; }
-    .export-button:disabled { opacity: .45; cursor: default; }
-    .history-list { display: flex; gap: 24px; min-height: 0; margin: 0; padding: 0 0 4px; overflow: auto; list-style: none; }
-    .history-round { flex: 0 0 auto; min-width: 160px; }
-    .history-round-title { margin-bottom: 8px; font-size: .875rem; color: #d4d4d4; overflow-wrap: anywhere; }
-    .history-numbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
-    .history-number { font-size: clamp(1rem, 1.4vw, 1.5rem); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
     .stage-status { position: fixed; left: 50%; top: 24px; z-index: 110; max-width: calc(100vw - 32px); padding: 14px 20px; border: 1px solid #777; border-radius: 10px; background: #171717; font-size: 1rem; text-align: center; transform: translateX(-50%); }
     .settings-dialog { width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 28px; overflow: auto; border: 1px solid #555; border-radius: 20px; color: #fff; background: #181818; box-shadow: 0 24px 80px rgba(0,0,0,.5); }
     .settings-dialog::backdrop { background: rgba(0,0,0,.72); }
@@ -115,10 +85,6 @@
 </head>
 <body>
   <div class="stage"><div class="winner-grid" id="winnerGrid" aria-label="추첨 번호" aria-busy="false"></div></div>
-  <aside class="history-panel" id="historyPanel" data-position="bottom" aria-label="누적 당첨 기록" hidden>
-    <div class="history-heading"><h2>당첨자 명단</h2><span class="history-total" id="historyTotal" aria-live="polite"></span><span class="save-status" id="saveStatus" role="status">엑셀 자동저장 대기</span><button class="export-button" id="exportWinners" type="button" aria-keyshortcuts="Control+S Meta+S">엑셀 별도 저장</button></div>
-    <ol class="history-list" id="historyList"></ol>
-  </aside>
   <div class="stage-status" id="stageStatus" role="status" hidden></div>
   <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle" aria-describedby="settingsDescription" aria-keyshortcuts="F2">
     <form id="settingsForm">
@@ -139,19 +105,14 @@
   <script>
     const stage = document.querySelector(".stage");
     const grid = document.getElementById("winnerGrid");
-    const historyPanel = document.getElementById("historyPanel");
-    const historyList = document.getElementById("historyList");
     const settingsDialog = document.getElementById("settingsDialog");
     const settingsCount = document.getElementById("settingsCount");
     const settingsPrize = document.getElementById("settingsPrize");
-    const exportButton = document.getElementById("exportWinners");
-    const saveStatus = document.getElementById("saveStatus");
     const settingsError = document.getElementById("settingsError");
     const stageStatus = document.getElementById("stageStatus");
     const confettiLayer = document.getElementById("confettiLayer");
     const fireConfetti = typeof confetti === "function" ? confetti.create(confettiLayer, { resize: true, useWorker: true }) : null;
     const store = LuckyDrawStore.create(localStorage);
-    const winnerSaver = LuckyDrawSave.create();
     const savedCount = Number(localStorage.getItem("luckydraw_count"));
     let drawCount = [1, 2, 3, 4].includes(savedCount) ? savedCount : 4;
     const drawLayout = "horizontal";
@@ -163,8 +124,7 @@
 
     function updateStageScale() {
       const count = Number(grid.dataset.count) || drawCount;
-      const historyBounds = historyPanel.getBoundingClientRect();
-      const contentBottom = historyPanel.hidden ? innerHeight : historyBounds.top - 24;
+      const contentBottom = innerHeight;
       const styles = getComputedStyle(stage);
       const digitGap = parseFloat(styles.getPropertyValue("--digit-gap"));
       const panelGap = parseFloat(styles.getPropertyValue("--horizontal-panel-gap"));
@@ -221,37 +181,6 @@
       updateStageScale();
     }
 
-    function renderHistory() {
-      const history = state?.history || [];
-      const fragment = document.createDocumentFragment();
-      let total = 0;
-      for (const round of [...history].reverse()) {
-        const item = document.createElement("li");
-        item.className = "history-round";
-        const title = document.createElement("div");
-        title.className = "history-round-title";
-        title.textContent = `${round.round}회 · ${round.prize}`;
-        const numbers = document.createElement("div");
-        numbers.className = "history-numbers";
-        for (const winner of round.winners) {
-          const number = document.createElement("span");
-          number.className = "history-number";
-          number.textContent = winner;
-          numbers.append(number);
-          total++;
-        }
-        item.append(title, numbers);
-        fragment.append(item);
-      }
-      historyList.replaceChildren(fragment);
-      document.getElementById("historyTotal").textContent = `총 ${total}명`;
-      historyPanel.hidden = true;
-      historyList.scrollTop = 0;
-      historyList.scrollLeft = 0;
-      exportButton.disabled = isPlaying || total === 0;
-      updateStageScale();
-    }
-
     function savePreferences(entries) {
       const previous = entries.map(([key]) => [key, localStorage.getItem(key)]);
       try {
@@ -265,9 +194,7 @@
     }
 
     function countPreferences(count) {
-      const entries = [["luckydraw_count", String(count)]];
-      if (count !== drawCount && state?.history.length) entries.push(["luckydraw_export_break_after", String(state.history.length)]);
-      return entries;
+      return [["luckydraw_count", String(count)]];
     }
 
     function setDrawCount(count) {
@@ -282,43 +209,6 @@
       const lastRound = state?.history.at(-1);
       renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
     }
-
-    function exportWinners() {
-      if (isPlaying) { showStageStatus("추첨이 끝난 뒤 당첨자명단을 저장해주세요."); return; }
-      try {
-        const saved = store.load();
-        const workbook = LuckyDrawExport.createWorkbook(saved.history, XLSX);
-        XLSX.writeFile(workbook, LuckyDrawExport.FILE_NAME, { compression: true });
-      } catch (error) {
-        showStageStatus(error.message || "당첨자명단을 저장하지 못했습니다.");
-      }
-    }
-    exportButton.addEventListener("click", exportWinners);
-
-    async function saveAutomaticWinners({ force = false } = {}) {
-      const saved = store.load();
-      if (!saved.history.length) return true;
-      saveStatus.dataset.state = "saving";
-      saveStatus.textContent = "엑셀 자동저장 중";
-      try {
-        const result = await winnerSaver.save(saved.history, { force });
-        saveStatus.dataset.state = "saved";
-        saveStatus.textContent = result?.downloaded ? "엑셀 자동 다운로드 요청 완료" : "엑셀 자동저장 완료";
-        return true;
-      } catch (error) {
-        saveStatus.dataset.state = "error";
-        saveStatus.textContent = "엑셀 자동저장 실패";
-        showStageStatus(error.message || "엑셀을 저장하지 못했습니다. 당첨 기록은 앱에 보관되어 있습니다.");
-        return false;
-      }
-    }
-    window.finalizeWinnerSave = () => saveAutomaticWinners({ force: true });
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden" && location.protocol !== "luckydraw:") void saveAutomaticWinners();
-    });
-    window.addEventListener("pagehide", () => {
-      if (location.protocol !== "luckydraw:") void saveAutomaticWinners();
-    });
 
     function showStageStatus(message) {
       clearTimeout(statusTimeout);
@@ -376,14 +266,12 @@
         return;
       }
       let result;
-      const separateBefore = state.history.length > 0 && Number(localStorage.getItem("luckydraw_export_break_after")) === state.history.length;
-      try { result = store.draw(drawCount, prizeName, { separateBefore }); } catch {
+      try { result = store.draw(drawCount, prizeName); } catch {
         alert("추첨 결과를 저장할 수 없어 시작하지 않았습니다. 저장 공간을 확인해주세요.");
         return;
       }
       state = result.state;
       isPlaying = true;
-      exportButton.disabled = true;
       stageStatus.hidden = true;
       const count = result.round.winners.length;
       renderCards(count);
@@ -406,24 +294,16 @@
         await wait(100);
       }
       renderCards(count, result.round.winners);
-      renderHistory();
       document.body.classList.remove("is-drawing");
       grid.setAttribute("aria-busy", "false");
       isPlaying = false;
-      exportButton.disabled = false;
       playConfetti();
-      await saveAutomaticWinners();
     }
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "F2" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
         event.preventDefault();
         if (!event.repeat && !event.isComposing) toggleSettings();
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        if (!event.repeat && !event.altKey && !isPlaying) exportWinners();
         return;
       }
       if (settingsDialog.open || event.target.closest?.("input, select, textarea, [contenteditable='true']")) return;
@@ -443,16 +323,13 @@
         state = store.load();
         const lastRound = state.history.at(-1);
         renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
-        renderHistory();
-      } catch { /* 기존 화면을 유지한다. */ }
+        } catch { /* 기존 화면을 유지한다. */ }
     });
     try {
       state = store.load();
       if (!state.remaining.length && !state.history.length) location.replace("upload.html");
       const lastRound = state.history.at(-1);
       renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
-      renderHistory();
-      if (state.history.length) void saveAutomaticWinners();
     } catch {
       alert("저장된 추첨 데이터를 불러오지 못했습니다. 참가자를 다시 등록해주세요.");
       location.replace("upload.html");

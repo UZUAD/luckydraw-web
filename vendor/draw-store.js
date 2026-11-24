@@ -67,7 +67,7 @@
       return save({ version: 2, participants, remaining: [...participants], history: [] });
     }
 
-    function draw(count, prize, options = {}) {
+    function draw(count, prize) {
       if (!Number.isInteger(count) || count < 1 || count > 4) throw new Error("추첨 인원은 1명부터 4명까지 선택해주세요.");
       const state = load();
       if (state.participants.length < count) throw new Error(`등록된 참가자는 ${state.participants.length}명입니다. 추첨 인원을 줄여주세요.`);
@@ -78,7 +78,6 @@
         winners.push(state.remaining.splice(eligible[chooseIndex(eligible.length)], 1)[0]);
       }
       const round = { round: state.history.length + 1, prize: String(prize).trim().slice(0, 80) || "럭키드로우", winners, drawnAt: new Date().toISOString() };
-      if (state.history.length && options.separateBefore) round.separateBefore = true;
       state.history.push(round);
       save(state);
       return { state, round };

@@ -8,8 +8,6 @@
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="vendor/background-store.js"></script>
   <script src="vendor/draw-store.js"></script>
-  <script src="vendor/winner-export.js"></script>
-  <script src="vendor/winner-save.js"></script>
 
   <style>
     :root {
@@ -858,7 +856,7 @@
 
         <div class="footer-note">
           등록하고 추첨 화면으로 이동 버튼을 누르면 참가자 번호가 저장되고, 바로 추첨 화면으로 이동합니다.
-          <br />당첨자명단은 추첨마다 자동 저장됩니다. 이 화면을 다시 열면 마지막 명단을 저장한 뒤 새 행사로 초기화합니다.
+          <br />이 화면을 다시 열면 참가자와 이전 추첨 기록을 초기화하고 새 행사를 시작합니다.
         </div>
       </article>
     </section>
@@ -903,8 +901,6 @@
     let backgroundPreviewUrl = null;
     let eventStarting = true;
     let eventReady = false;
-    let openingDrawScreen = false;
-    const winnerSaver = LuckyDrawSave.create();
 
     async function startNewEvent() {
       eventStarting = true;
@@ -912,15 +908,12 @@
       submitButton.disabled = true;
       try {
         const store = LuckyDrawStore.create(localStorage);
-        await winnerSaver.save(store.load().history, { force: true });
         store.register([]);
-        winnerSaver.newEvent();
         localStorage.setItem("luckydraw_count", "4");
         localStorage.setItem("luckydraw_prize", "");
-        localStorage.removeItem("luckydraw_export_break_after");
         eventReady = true;
       } catch {
-        showFeedbackModal("이전 당첨자명단을 저장하지 못해 초기화하지 않았습니다. 엑셀 파일과 저장 위치를 확인한 뒤 이 화면을 다시 열어주세요.");
+        showFeedbackModal("새 추첨을 시작하지 못했습니다. 브라우저 저장 공간을 확인한 뒤 이 화면을 다시 열어주세요.");
       } finally {
         eventStarting = false;
         submitButton.disabled = !eventReady;
@@ -929,12 +922,6 @@
     }
     window.eventInitialization = startNewEvent();
     window.addEventListener("pageshow", (event) => { if (event.persisted) window.eventInitialization = startNewEvent(); });
-    window.finalizeWinnerSave = async () => {
-      await window.eventInitialization;
-      try { await winnerSaver.save(LuckyDrawStore.create(localStorage).load().history, { force: true }); return true; }
-      catch { return false; }
-    };
-
     function formatFileSize(bytes) {
       if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
       return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
@@ -1150,20 +1137,8 @@
     startNumberInput.addEventListener("input", updateRangePreview);
     endNumberInput.addEventListener("input", updateRangePreview);
 
-    async function openDrawScreen() {
-      if (openingDrawScreen) return;
-      openingDrawScreen = true;
-      try {
-        if (!await winnerSaver.prepare({ persist: true })) {
-          showFeedbackModal("당첨자 엑셀의 자동 저장 위치를 선택해주세요. 확인을 누르면 다시 선택할 수 있습니다.", { title: "자동 저장 설정", onClose: openDrawScreen });
-          return;
-        }
-        location.href = "index.html";
-      } catch (error) {
-        showFeedbackModal(error.message || "자동 저장 위치를 설정하지 못했습니다. 확인을 눌러 다시 시도해주세요.", { title: "자동 저장 설정", onClose: openDrawScreen });
-      } finally {
-        openingDrawScreen = false;
-      }
+    function openDrawScreen() {
+      location.href = "index.html";
     }
 
     function saveNumbersAndContinue(numbers) {
