@@ -106,7 +106,6 @@ function configureOfflineProtocol() {
     { urls: ["http://*/*", "https://*/*"] },
     (_details, callback) => callback({ cancel: true })
   );
-
 }
 
 function configureWindowNavigation(window) {

@@ -306,7 +306,7 @@
         if (!event.repeat && !event.isComposing) toggleSettings();
         return;
       }
-      if (settingsDialog.open || event.target.closest?.("input, select, textarea, [contenteditable='true']")) return;
+      if (settingsDialog.open) return;
       if (/^[1-4]$/.test(event.key) && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
         event.preventDefault();
         if (!event.repeat && !event.isComposing) setDrawCount(Number(event.key));
@@ -323,7 +323,7 @@
         state = store.load();
         const lastRound = state.history.at(-1);
         renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
-        } catch { /* 기존 화면을 유지한다. */ }
+      } catch { /* 기존 화면을 유지한다. */ }
     });
     try {
       state = store.load();
