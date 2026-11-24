@@ -123,7 +123,7 @@
   <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle" aria-describedby="settingsDescription" aria-keyshortcuts="F2">
     <form id="settingsForm">
       <h2 id="settingsTitle">추첨 설정</h2>
-      <p class="settings-description" id="settingsDescription">숫자키 1·2·3·4로 번호판 개수를 바로 바꿀 수 있습니다. 기존 당첨 기록과 중복 당첨 방지는 유지됩니다.</p>
+      <p class="settings-description" id="settingsDescription">숫자키 1·2·3·4로 번호판 개수를 바꿉니다. 참가자를 모두 뽑으면 전체 명단으로 다시 추첨하며, 한 회차에서는 중복으로 뽑지 않습니다.</p>
       <label class="settings-field">동시에 돌릴 번호판
         <select id="settingsCount" autofocus><option value="1">1개 · 1명 추첨</option><option value="2">2개 · 2명 동시 추첨</option><option value="3">3개 · 3명 동시 추첨</option><option value="4">4개 · 4명 동시 추첨</option></select>
       </label>
@@ -335,7 +335,7 @@
       if (settingsDialog.open) { settingsDialog.close(); return; }
       settingsCount.value = String(drawCount);
       settingsPrize.value = prizeName === "럭키드로우" ? "" : prizeName;
-      document.getElementById("settingsRemaining").textContent = `남은 참가자 ${state?.remaining.length || 0}명 · Enter 키로 추첨 시작`;
+      document.getElementById("settingsRemaining").textContent = `등록 참가자 ${state?.participants.length || 0}명 · 횟수 제한 없이 반복 추첨 · Enter 키로 시작`;
       settingsError.hidden = true;
       stageStatus.hidden = true;
       settingsDialog.showModal();
@@ -371,8 +371,8 @@
 
     async function startDraw() {
       if (isPlaying || settingsDialog.open || !state) return;
-      if (state.remaining.length < drawCount) {
-        showStageStatus(`남은 참가자는 ${state.remaining.length}명입니다. F2 설정에서 추첨 개수를 줄여주세요.`);
+      if (state.participants.length < drawCount) {
+        showStageStatus(`등록된 참가자는 ${state.participants.length}명입니다. F2 설정에서 추첨 개수를 줄여주세요.`);
         return;
       }
       let result;

@@ -50,10 +50,10 @@ test("참가자가 부족하면 일부 인원만 뽑지 않고 상태를 보존�
   const store = create(storage);
   store.register(participants.slice(0, 3));
   const before = storage.getItem(STATE_KEY);
-  assert.throws(() => store.draw(4, "상품"), /남은 참가자는 3명/);
+  assert.throws(() => store.draw(4, "상품"), /등록된 참가자는 3명/);
   assert.equal(storage.getItem(STATE_KEY), before);
   assert.equal(store.draw(3, "상품").state.remaining.length, 0);
-  assert.throws(() => store.draw(1, "상품"), /남은 참가자는 0명/);
+  assert.equal(store.draw(1, "상품").round.winners.length, 1);
 });
 
 test("기존 참가자를 가져올 때 앞자리 0을 유지하고 중복 사번을 제거한다", () => {
@@ -101,4 +101,45 @@ test("잘못된 인원과 손상된 기록은 추첨 전에 거부한다", () =>
   for (const count of [0, 5, 1.5, NaN]) assert.throws(() => store.draw(count, "상품"), /추첨 인원/);
   storage.setItem(STATE_KEY, JSON.stringify({ version: 1, remaining: participants, history: [{ round: 1, prize: "상품", winners: ["000001", "000001"], drawnAt: new Date().toISOString() }] }));
   assert.throws(() => store.load(), /당첨 기록/);
+});
+
+test("100명을 모두 뽑은 뒤에도 계속 추첨하고 기록을 누적한다", () => {
+  const storage = memoryStorage();
+  const store = create(storage, () => 0);
+  const full = Array.from({ length: 100 }, (_, index) => String(index + 1).padStart(6, "0"));
+  store.register(full);
+  for (let index = 0; index < 25; index++) store.draw(4, "상품");
+  assert.equal(store.load().remaining.length, 0);
+  for (let index = 0; index < 30; index++) {
+    const { round } = store.draw(4, "상품");
+    assert.equal(new Set(round.winners).size, 4);
+  }
+  const saved = create(storage).load();
+  assert.equal(saved.history.length, 55);
+  assert.equal(saved.history.flatMap((round) => round.winners).length, 220);
+  assert.equal(saved.participants.length, 100);
+});
+
+test("남은 인원이 1명이어도 다음 순환을 이어 4명을 중복 없이 뽑는다", () => {
+  const store = create(memoryStorage(), () => 0);
+  store.register(["1", "2", "3", "4", "5"]);
+  store.draw(4, "상품");
+  assert.equal(store.load().remaining.length, 1);
+  const { round, state } = store.draw(4, "상품");
+  assert.deepEqual(round.winners, ["000005", "000001", "000002", "000003"]);
+  assert.equal(new Set(round.winners).size, 4);
+  assert.deepEqual(state.remaining, ["000004", "000005"]);
+});
+
+test("이미 남은 참가자가 0명인 이전 버전 데이터도 다시 업로드하지 않고 복구한다", () => {
+  const storage = memoryStorage();
+  const history = [{ round: 1, prize: "기존 상품", winners: ["000001", "000002", "000003", "000004"], drawnAt: new Date().toISOString() }];
+  storage.setItem(STATE_KEY, JSON.stringify({ version: 1, remaining: [], history }));
+  const store = create(storage, () => 0);
+  const { state, round } = store.draw(4, "새 상품");
+  assert.equal(state.version, 2);
+  assert.equal(state.participants.length, 4);
+  assert.deepEqual(state.history[0], history[0]);
+  assert.equal(state.history.length, 2);
+  assert.deepEqual(round.winners, history[0].winners);
 });

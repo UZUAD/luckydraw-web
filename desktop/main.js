@@ -416,8 +416,11 @@ async function testLiveSettings(window) {
         }
       }
       const before = localStorage.getItem(LuckyDrawStore.STATE_KEY);
-      await startDraw();
-      if (before !== localStorage.getItem(LuckyDrawStore.STATE_KEY) || stageStatus.hidden || isPlaying) throw new Error("insufficient participants changed state");
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+      if (!isPlaying) throw new Error("roulette stopped at the end of the participant pool");
+      while (isPlaying) await wait(80);
+      await winnerSaver.flush();
+      if (before === localStorage.getItem(LuckyDrawStore.STATE_KEY) || store.load().history.at(-1).winners.length !== 3) throw new Error("repeat draw did not append winners");
       stageStatus.hidden = true;
     })()
   `);
@@ -456,8 +459,9 @@ async function testLiveSettings(window) {
   }
   return window.webContents.executeJavaScript(`(() => {
     const saved = store.load();
-    if (new Set(saved.history.flatMap((round) => round.winners)).size !== 14 || saved.remaining.length !== 1 ||
-        JSON.stringify(saved.history.map((round) => round.winners.length)) !== JSON.stringify([4, 4, 1, 2, 3])) throw new Error("mixed counts lost results or repeated a winner");
+    if (new Set(saved.history.flatMap((round) => round.winners)).size !== 15 || saved.remaining.length !== 13 ||
+        JSON.stringify(saved.history.map((round) => round.winners.length)) !== JSON.stringify([4, 4, 1, 2, 3, 3]) ||
+        saved.history.some((round) => new Set(round.winners).size !== round.winners.length)) throw new Error("repeat draw lost results or duplicated winners within a round");
     return saved;
   })()`);
 }
@@ -737,7 +741,7 @@ function installSelfTest(window) {
         await testBatchDraw(window);
         const automatic = await testAutomaticWorkbook(window, 8);
         const batchResult = await testLiveSettings(window);
-        const updated = await testAutomaticWorkbook(window, 14);
+        const updated = await testAutomaticWorkbook(window, 17);
         if (automatic.destination !== updated.destination) throw new Error("each draw created another automatic workbook instead of updating the same file");
         const exported = await testWinnerExport(window);
         if (!updated.bytes.equals(await fs.readFile(updated.destination))) throw new Error("count shortcuts changed the automatically saved workbook");
@@ -759,7 +763,7 @@ function installSelfTest(window) {
         if (JSON.stringify(recovered.history) !== JSON.stringify(batchResult.history) || !recovered.historyHidden || !recovered.settingsHidden || recovered.count !== 3 ||
             JSON.stringify(recovered.recorded) !== JSON.stringify([...batchResult.history].reverse().flatMap((round) => round.winners)) ||
             recovered.layout !== "horizontal" ||
-            JSON.stringify(recovered.displayed) !== JSON.stringify(batchResult.history.at(-1).winners) || recovered.remaining.length !== 1) {
+            JSON.stringify(recovered.displayed) !== JSON.stringify(batchResult.history.at(-1).winners) || recovered.remaining.length !== 13) {
           throw new Error(`reload recovery failed: ${JSON.stringify(recovered)}`);
         }
 
@@ -781,7 +785,7 @@ function installSelfTest(window) {
         const finalizedBytes = await fs.readFile(updated.destination);
         const finalizedBook = xlsx.read(finalizedBytes, { type: "buffer" });
         const finalizedWinners = xlsx.utils.sheet_to_json(finalizedBook.Sheets["당첨자명단"], { header: 1 }).slice(1).filter((row) => row[0]);
-        if (finalizedWinners.length !== 15) throw new Error("upload transition lost the last unanimated winner");
+        if (finalizedWinners.length !== 18) throw new Error("upload transition lost the last unanimated winner");
 
         await window.webContents.executeJavaScript(
           `Promise.all([
@@ -802,7 +806,7 @@ function installSelfTest(window) {
             const winners = xlsx.utils.sheet_to_json(book.Sheets["당첨자명단"], { header: 1 }).slice(1).filter((row) => row[0]).map((row) => row[3]);
             if (path.basename(destination) !== "당첨자명단_2.xlsx" || destination === updated.destination || JSON.stringify(winners) !== JSON.stringify(["999999"]) || !finalizedBytes.equals(readFileSync(updated.destination))) throw new Error("shutdown did not save the new event to _2 or overwrote _1");
             clearTimeout(timeout);
-            process.stdout.write("SELF_TEST_OK: Enter starts roulette even on the export button, number keys only change count, same-event _1 autosave and path recovery, new-event _2 on actual window close, cumulative results after every draw, and upload transition saves before reset\n");
+            process.stdout.write("SELF_TEST_OK: Enter starts repeat draws past participant exhaustion, unique winners within each round, number keys only change count, same-event _1 cumulative autosave and recovery, new-event _2 on close, and upload transition saves before reset\n");
           } catch (error) {
             event.preventDefault();
             process.stdout.write(`SELF_TEST_FAILED: ${error.message}\n`);
