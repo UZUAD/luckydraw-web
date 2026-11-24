@@ -245,7 +245,7 @@
       }
       historyList.replaceChildren(fragment);
       document.getElementById("historyTotal").textContent = `총 ${total}명`;
-      historyPanel.hidden = history.length === 0;
+      historyPanel.hidden = true;
       historyList.scrollTop = 0;
       historyList.scrollLeft = 0;
       exportButton.disabled = isPlaying || total === 0;
@@ -290,7 +290,6 @@
         const saved = store.load();
         const workbook = LuckyDrawExport.createWorkbook(saved.history, XLSX);
         XLSX.writeFile(workbook, LuckyDrawExport.FILE_NAME, { compression: true });
-        showStageStatus("당첨자명단.xlsx 저장을 시작했습니다.");
       } catch (error) {
         showStageStatus(error.message || "당첨자명단을 저장하지 못했습니다.");
       }
