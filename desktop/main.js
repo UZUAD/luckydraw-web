@@ -11,6 +11,7 @@ const CAPTURE_DIR = process.env.LUCKYDRAW_CAPTURE_DIR;
 const ALWAYS_FULLSCREEN = !SELF_TEST;
 const pendingDownloadPaths = new Set();
 const winnerSavePaths = new Map();
+let winnerPathsReady;
 let winnerWriteQueue = Promise.resolve();
 let isQuitting = false;
 let quitApproved = false;
@@ -96,17 +97,35 @@ function winnerDirectory() {
   return SELF_TEST ? path.join(app.getPath("userData"), "Desktop") : app.getPath("desktop");
 }
 
+function loadWinnerSavePaths() {
+  if (!winnerPathsReady) winnerPathsReady = (async () => {
+    try {
+      const saved = JSON.parse(await fs.readFile(path.join(app.getPath("userData"), "winner-save-paths.json"), "utf8"));
+      for (const [id, fileName] of Object.entries(saved)) {
+        if (/^[a-zA-Z0-9-]{1,100}$/.test(id) && /^당첨자명단_\d+\.xlsx$/.test(fileName)) {
+          winnerSavePaths.set(id, path.join(winnerDirectory(), fileName));
+        }
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  })();
+  return winnerPathsReady;
+}
+
 function saveWinnerWorkbook(eventId, bytes) {
   const task = winnerWriteQueue.then(async () => {
+    await loadWinnerSavePaths();
     const directory = winnerDirectory();
     await fs.mkdir(directory, { recursive: true });
     let destination = winnerSavePaths.get(eventId);
     if (!destination) {
-      destination = path.join(directory, "당첨자명단.xlsx");
-      let suffix = 2;
-      while (existsSync(destination) || pendingDownloadPaths.has(destination) || [...winnerSavePaths.values()].includes(destination)) {
-        destination = path.join(directory, `당첨자명단 (${suffix++}).xlsx`);
-      }
+      const names = [...await fs.readdir(directory), ...[...winnerSavePaths.values()].map((filePath) => path.basename(filePath))];
+      const highest = names.reduce((maximum, name) => {
+        const match = /^당첨자명단_(\d+)\.xlsx$/.exec(name);
+        return match ? Math.max(maximum, Number(match[1])) : maximum;
+      }, 0);
+      destination = path.join(directory, `당첨자명단_${highest + 1}.xlsx`);
       winnerSavePaths.set(eventId, destination);
     }
     const temporary = `${destination}.${process.pid}.tmp`;
@@ -116,6 +135,10 @@ function saveWinnerWorkbook(eventId, bytes) {
     } finally {
       await fs.rm(temporary, { force: true }).catch(() => {});
     }
+    const metadata = path.join(app.getPath("userData"), "winner-save-paths.json");
+    const metadataTemporary = `${metadata}.${process.pid}.tmp`;
+    await fs.writeFile(metadataTemporary, JSON.stringify(Object.fromEntries([...winnerSavePaths].map(([id, filePath]) => [id, path.basename(filePath)]))));
+    await fs.rename(metadataTemporary, metadata);
     return { fileName: path.basename(destination) };
   });
   winnerWriteQueue = task.catch(() => {});

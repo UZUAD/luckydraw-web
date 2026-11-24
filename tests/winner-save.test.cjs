@@ -74,7 +74,7 @@ test("브라우저는 바탕화면 저장 위치를 한 번 선택하고 같은 
     showSaveFilePicker: async (options) => {
       choices++;
       assert.equal(options.startIn, "desktop");
-      assert.equal(options.suggestedName, "당첨자명단.xlsx");
+      assert.equal(options.suggestedName, "당첨자명단_1.xlsx");
       return handle;
     }
   } });
@@ -92,4 +92,65 @@ test("브라우저에서 저장 위치 선택을 취소하면 추첨 준비를 �
     showSaveFilePicker: async () => { const error = new Error("취소"); error.name = "AbortError"; throw error; }
   } });
   assert.equal(await saver.prepare(), false);
+});
+
+test("첫 행사 파일은 _1에 누적하고 새 행사는 _2로 저장한다", async () => {
+  const files = [];
+  const writes = [];
+  const saver = create({ storage: memoryStorage(), xlsx: { ...XLSX, writeFile: (workbook, fileName) => {
+    files.push(fileName);
+    writes.push(numbers(XLSX.write(workbook, { type: "array", bookType: "xlsx" })));
+  } }, exporter, environment: { location: { protocol: "https:" }, crypto: { randomUUID } } });
+  await saver.save(rounds.slice(0, 1));
+  await saver.save(rounds);
+  saver.newEvent();
+  await saver.save(rounds.slice(0, 1));
+  assert.deepEqual(files, ["당첨자명단_1.xlsx", "당첨자명단_1.xlsx", "당첨자명단_2.xlsx"]);
+  assert.deepEqual(writes, [["000001"], ["000001", "000002", "000003"], ["000001"]]);
+});
+
+test("등록 화면에서 선택한 저장 위치를 추첨 화면에서도 재사용한다", async () => {
+  const storage = memoryStorage();
+  const handles = new Map();
+  const writes = [];
+  let choices = 0;
+  const handle = { name: "당첨자명단_1.xlsx", queryPermission: async () => "granted", createWritable: async () => {
+    let bytes;
+    return { write: async (value) => { bytes = value; }, close: async () => writes.push(numbers(bytes)) };
+  } };
+  const indexedDB = { open: () => {
+    const request = {};
+    queueMicrotask(() => {
+      request.result = { close() {}, transaction: () => {
+        const transaction = { objectStore: () => ({ get: (key) => {
+          const result = { result: handles.get(key) };
+          queueMicrotask(() => transaction.oncomplete());
+          return result;
+        }, put: (value, key) => {
+          handles.set(key, value);
+          queueMicrotask(() => transaction.oncomplete());
+          return {};
+        } }) };
+        return transaction;
+      } };
+      request.onsuccess();
+    });
+    return request;
+  } };
+  const environment = { location: { protocol: "https:" }, crypto: { randomUUID }, indexedDB,
+    showSaveFilePicker: async () => { choices++; return handle; } };
+  const registrationSaver = create({ storage, xlsx: XLSX, exporter, environment });
+  assert.equal(await registrationSaver.prepare({ persist: true }), true);
+  const drawSaver = create({ storage, xlsx: XLSX, exporter, environment });
+  await drawSaver.save(rounds.slice(0, 1));
+  await drawSaver.save(rounds);
+  assert.equal(choices, 1);
+  assert.deepEqual(writes, [["000001"], ["000001", "000002", "000003"]]);
+});
+
+test("저장 위치를 기억하지 못하면 등록 화면에서 설정 실패를 알린다", async () => {
+  const saver = create({ storage: memoryStorage(), xlsx: XLSX, exporter, environment: {
+    location: { protocol: "https:" }, crypto: { randomUUID }, showSaveFilePicker: async () => ({ name: "명단.xlsx" })
+  } });
+  await assert.rejects(saver.prepare({ persist: true }), /자동 저장 위치를 기억하지 못했습니다/);
 });
