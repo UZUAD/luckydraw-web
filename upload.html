@@ -8,6 +8,8 @@
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="vendor/background-store.js"></script>
   <script src="vendor/draw-store.js"></script>
+  <script src="vendor/winner-export.js"></script>
+  <script src="vendor/winner-save.js"></script>
 
   <style>
     :root {
@@ -856,7 +858,7 @@
 
         <div class="footer-note">
           등록하고 추첨 화면으로 이동 버튼을 누르면 참가자 번호가 저장되고, 바로 추첨 화면으로 이동합니다.
-          <br />이 업로드 화면을 다시 열면 새 행사로 시작하며 이전 당첨 명단이 초기화됩니다. 필요한 명단은 추첨 화면에서 엑셀로 저장해주세요.
+          <br />당첨자명단은 추첨마다 자동 저장됩니다. 이 화면을 다시 열면 마지막 명단을 저장한 뒤 새 행사로 초기화합니다.
         </div>
       </article>
     </section>
@@ -899,19 +901,38 @@
     let activeMode = "excel";
     let modalCloseHandler = null;
     let backgroundPreviewUrl = null;
+    let eventStarting = true;
+    let eventReady = false;
+    const winnerSaver = LuckyDrawSave.create();
 
-    function startNewEvent() {
+    async function startNewEvent() {
+      eventStarting = true;
+      eventReady = false;
+      submitButton.disabled = true;
       try {
-        LuckyDrawStore.create(localStorage).register([]);
+        const store = LuckyDrawStore.create(localStorage);
+        await winnerSaver.save(store.load().history, { force: true });
+        store.register([]);
+        winnerSaver.newEvent();
         localStorage.setItem("luckydraw_count", "4");
         localStorage.setItem("luckydraw_prize", "");
         localStorage.removeItem("luckydraw_export_break_after");
+        eventReady = true;
       } catch {
-        showFeedbackModal("새 행사를 시작할 수 없습니다. 저장 공간을 확인한 뒤 업로드 화면을 다시 열어주세요.");
+        showFeedbackModal("이전 당첨자명단을 저장하지 못해 초기화하지 않았습니다. 엑셀 파일과 저장 위치를 확인한 뒤 이 화면을 다시 열어주세요.");
+      } finally {
+        eventStarting = false;
+        submitButton.disabled = !eventReady;
       }
+      return eventReady;
     }
-    startNewEvent();
-    window.addEventListener("pageshow", (event) => { if (event.persisted) startNewEvent(); });
+    window.eventInitialization = startNewEvent();
+    window.addEventListener("pageshow", (event) => { if (event.persisted) window.eventInitialization = startNewEvent(); });
+    window.finalizeWinnerSave = async () => {
+      await window.eventInitialization;
+      try { await winnerSaver.save(LuckyDrawStore.create(localStorage).load().history, { force: true }); return true; }
+      catch { return false; }
+    };
 
     function formatFileSize(bytes) {
       if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
@@ -1129,6 +1150,7 @@
     endNumberInput.addEventListener("input", updateRangePreview);
 
     function saveNumbersAndContinue(numbers) {
+      if (eventStarting || !eventReady) return;
       try {
         numbers = LuckyDrawStore.normalizeNumbers(numbers);
         LuckyDrawStore.create(localStorage).register(numbers);

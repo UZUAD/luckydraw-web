@@ -10,7 +10,11 @@ const SELF_TEST = process.argv.includes("--self-test");
 const CAPTURE_DIR = process.env.LUCKYDRAW_CAPTURE_DIR;
 const ALWAYS_FULLSCREEN = !SELF_TEST;
 const pendingDownloadPaths = new Set();
+const winnerSavePaths = new Map();
+let winnerWriteQueue = Promise.resolve();
 let isQuitting = false;
+let quitApproved = false;
+let quitSaving = false;
 
 if (SELF_TEST) {
   app.setPath("userData", path.join(os.tmpdir(), `luckydraw-self-test-${process.pid}`));
@@ -88,10 +92,61 @@ async function saveBundledFileToDownloads(requestUrl) {
   return destinationPath;
 }
 
+function winnerDirectory() {
+  return SELF_TEST ? path.join(app.getPath("userData"), "Desktop") : app.getPath("desktop");
+}
+
+function saveWinnerWorkbook(eventId, bytes) {
+  const task = winnerWriteQueue.then(async () => {
+    const directory = winnerDirectory();
+    await fs.mkdir(directory, { recursive: true });
+    let destination = winnerSavePaths.get(eventId);
+    if (!destination) {
+      destination = path.join(directory, "당첨자명단.xlsx");
+      let suffix = 2;
+      while (existsSync(destination) || pendingDownloadPaths.has(destination) || [...winnerSavePaths.values()].includes(destination)) {
+        destination = path.join(directory, `당첨자명단 (${suffix++}).xlsx`);
+      }
+      winnerSavePaths.set(eventId, destination);
+    }
+    const temporary = `${destination}.${process.pid}.tmp`;
+    try {
+      await fs.writeFile(temporary, bytes);
+      await fs.rename(temporary, destination);
+    } finally {
+      await fs.rm(temporary, { force: true }).catch(() => {});
+    }
+    return { fileName: path.basename(destination) };
+  });
+  winnerWriteQueue = task.catch(() => {});
+  return task;
+}
+
+async function finalizeWindows() {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue;
+    const saved = await window.webContents.executeJavaScript("window.finalizeWinnerSave ? window.finalizeWinnerSave() : true");
+    if (saved === false) throw new Error("final winner save failed");
+  }
+  await winnerWriteQueue;
+}
+
 function configureOfflineProtocol() {
   protocol.handle(APP_SCHEME, async (request) => {
     const resourcePath = resourcePathFromUrl(request.url);
     if (!resourcePath) return new Response("Not found", { status: 404 });
+
+    if (new URL(request.url).pathname === "/_save-winners") {
+      const eventId = request.headers.get("X-LuckyDraw-Event") || "";
+      if (request.method !== "POST" || !/^[a-zA-Z0-9-]{1,100}$/.test(eventId)) return new Response("Invalid save request", { status: 400 });
+      try {
+        const bytes = Buffer.from(await request.arrayBuffer());
+        if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) return new Response("Invalid workbook", { status: 400 });
+        return new Response(JSON.stringify(await saveWinnerWorkbook(eventId, bytes)), { headers: { "Content-Type": "application/json" } });
+      } catch {
+        return new Response(JSON.stringify({ error: "바탕화면에 엑셀을 저장하지 못했습니다. 파일이 열려 있으면 닫고 다시 저장해주세요." }), { status: 500, headers: { "Content-Type": "application/json" } });
+      }
+    }
 
     try {
       const data = await fs.readFile(resourcePath);
@@ -112,11 +167,11 @@ function configureOfflineProtocol() {
   session.defaultSession.on("will-download", (event, item, contents) => {
     if (!contents?.getURL().startsWith(`${APP_SCHEME}://${APP_HOST}/`) || item.getFilename() !== "당첨자명단.xlsx") return;
     try {
-      const directory = SELF_TEST ? path.join(app.getPath("userData"), "Downloads") : app.getPath("downloads");
+      const directory = winnerDirectory();
       mkdirSync(directory, { recursive: true });
       let destination = path.join(directory, "당첨자명단.xlsx");
       let suffix = 2;
-      while (existsSync(destination) || pendingDownloadPaths.has(destination)) destination = path.join(directory, `당첨자명단 (${suffix++}).xlsx`);
+      while (existsSync(destination) || pendingDownloadPaths.has(destination) || [...winnerSavePaths.values()].includes(destination)) destination = path.join(directory, `당첨자명단 (${suffix++}).xlsx`);
       item.setSavePath(destination);
       pendingDownloadPaths.add(destination);
       item.once("done", (_event, downloadState) => {
@@ -129,7 +184,7 @@ function configureOfflineProtocol() {
       });
     } catch {
       event.preventDefault();
-      if (!contents.isDestroyed()) contents.executeJavaScript('showStageStatus("당첨자명단을 저장하지 못했습니다. 다운로드 폴더를 확인해주세요.")').catch(() => {});
+      if (!contents.isDestroyed()) contents.executeJavaScript('showStageStatus("당첨자명단을 저장하지 못했습니다. 바탕화면 폴더를 확인해주세요.")').catch(() => {});
     }
   });
 }
@@ -170,6 +225,11 @@ function configureWindowNavigation(window) {
   window.on("leave-full-screen", () => {
     if (!ALWAYS_FULLSCREEN || isQuitting) return;
     window.setFullScreen(true);
+  });
+  window.on("close", (event) => {
+    if (quitApproved) return;
+    event.preventDefault();
+    if (!quitSaving) app.quit();
   });
 }
 
@@ -382,7 +442,8 @@ async function testWinnerExport(window) {
   await window.webContents.executeJavaScript('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", code: "Digit1" }))');
   if (!firstBytes.equals(await fs.readFile(firstPath))) throw new Error("count shortcut changed the saved Excel file");
   const secondPath = await download('document.dispatchEvent(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))');
-  if (path.basename(firstPath) !== "당첨자명단.xlsx" || path.basename(secondPath) !== "당첨자명단 (2).xlsx" ||
+  if (path.basename(firstPath) !== "당첨자명단 (2).xlsx" || path.basename(secondPath) !== "당첨자명단 (3).xlsx" ||
+      path.dirname(firstPath) !== winnerDirectory() ||
       !firstBytes.equals(await fs.readFile(firstPath))) throw new Error("winner export overwrote an existing file");
   const xlsx = require("../vendor/xlsx.full.min.js");
   for (const filePath of [firstPath, secondPath]) {
@@ -404,6 +465,19 @@ async function testWinnerExport(window) {
   return { firstPath, firstBytes };
 }
 
+async function testAutomaticWorkbook(window, expectedCount) {
+  await window.webContents.executeJavaScript("winnerSaver.flush()");
+  const saved = await window.webContents.executeJavaScript("({ id: localStorage.getItem('luckydraw_event_id'), history: store.load().history, status: saveStatus.dataset.state })");
+  const destination = winnerSavePaths.get(saved.id);
+  if (!destination || path.dirname(destination) !== winnerDirectory() || saved.status !== "saved") throw new Error("desktop automatic save did not complete");
+  const xlsx = require("../vendor/xlsx.full.min.js");
+  const bytes = await fs.readFile(destination);
+  const workbook = xlsx.read(bytes, { type: "buffer" });
+  const actual = xlsx.utils.sheet_to_json(workbook.Sheets["당첨자명단"], { header: 1 }).slice(1).filter((row) => row[0]).map((row) => row[3]);
+  if (actual.length !== expectedCount || JSON.stringify(actual) !== JSON.stringify(saved.history.flatMap((round) => round.winners))) throw new Error("automatic workbook does not contain the latest cumulative winners");
+  return { destination, bytes };
+}
+
 function installSelfTest(window) {
   let stage = 0;
   const timeout = setTimeout(() => {
@@ -416,6 +490,7 @@ function installSelfTest(window) {
 
     try {
       if (stage === 0 && url.endsWith("/upload.html")) {
+        if (!await window.webContents.executeJavaScript("window.eventInitialization")) throw new Error("new event initialization failed");
         const firstDownload = await saveBundledFileToDownloads(
           `${APP_SCHEME}://${APP_HOST}/files/luckydraw_sample.xlsx`
         );
@@ -614,8 +689,12 @@ function installSelfTest(window) {
         }
 
         await testBatchDraw(window);
+        const automatic = await testAutomaticWorkbook(window, 8);
         const batchResult = await testLiveSettings(window);
+        const updated = await testAutomaticWorkbook(window, 14);
+        if (automatic.destination !== updated.destination) throw new Error("each draw created another automatic workbook instead of updating the same file");
         const exported = await testWinnerExport(window);
+        if (!updated.bytes.equals(await fs.readFile(updated.destination))) throw new Error("count shortcuts changed the automatically saved workbook");
         stage = 2;
         await new Promise((resolve) => {
           window.webContents.once("did-finish-load", resolve);
@@ -637,8 +716,11 @@ function installSelfTest(window) {
           throw new Error(`reload recovery failed: ${JSON.stringify(recovered)}`);
         }
 
+        // 저장됐지만 연출이 끝나지 않은 마지막 한 명도 업로드 화면에서 저장한다.
+        await window.webContents.executeJavaScript('state = store.draw(1, "이동 직전 당첨자").state');
         stage = 3;
         await window.loadURL(`${APP_SCHEME}://${APP_HOST}/upload.html`);
+        if (!await window.webContents.executeJavaScript("window.eventInitialization")) throw new Error("upload transition failed to finalize the workbook");
         const reset = await window.webContents.executeJavaScript(`({
           saved: LuckyDrawStore.create(localStorage).load(),
           numbers: JSON.parse(localStorage.getItem("luckydraw_numbers")),
@@ -648,6 +730,11 @@ function installSelfTest(window) {
         })`);
         if (reset.saved.history.length || reset.saved.remaining.length || reset.numbers.length || reset.count !== "4" || reset.pendingBreak !== null || !reset.noDrawSettings ||
             !exported.firstBytes.equals(await fs.readFile(exported.firstPath))) throw new Error("upload reentry did not start a new event or changed the exported archive");
+        const xlsx = require("../vendor/xlsx.full.min.js");
+        const finalizedBytes = await fs.readFile(updated.destination);
+        const finalizedBook = xlsx.read(finalizedBytes, { type: "buffer" });
+        const finalizedWinners = xlsx.utils.sheet_to_json(finalizedBook.Sheets["당첨자명단"], { header: 1 }).slice(1).filter((row) => row[0]);
+        if (finalizedWinners.length !== 15) throw new Error("upload transition lost the last unanimated winner");
 
         await window.webContents.executeJavaScript(
           `Promise.all([
@@ -655,10 +742,27 @@ function installSelfTest(window) {
             Promise.resolve(localStorage.removeItem("luckydraw_numbers"))
           ])`
         );
-        clearTimeout(timeout);
-
-        process.stdout.write("SELF_TEST_OK: registration, offline assets and backgrounds, number-key 1–4 counts, F2 settings and Escape close, unique results, horizontal panels and bottom history, animation lock, reload recovery, actual Excel downloads with blank group separators and leading zeros, preserved Excel data on count change, and upload reentry resets the event\n");
-        app.exit(0);
+        // 새 행사의 미공개 결과를 남기고 실제 창을 닫아 종료 직전 저장을 검증한다.
+        await window.webContents.executeJavaScript('LuckyDrawStore.create(localStorage).register(["999999"]); localStorage.setItem("luckydraw_count", "1")');
+        stage = 4;
+        await window.loadURL(`${APP_SCHEME}://${APP_HOST}/index.html`);
+        const closingEvent = await window.webContents.executeJavaScript('state = store.draw(1, "종료 직전 당첨자").state; isPlaying = true; localStorage.getItem("luckydraw_event_id")');
+        app.once("will-quit", (event) => {
+          try {
+            const destination = winnerSavePaths.get(closingEvent);
+            const { readFileSync } = require("node:fs");
+            const book = xlsx.read(readFileSync(destination), { type: "buffer" });
+            const winners = xlsx.utils.sheet_to_json(book.Sheets["당첨자명단"], { header: 1 }).slice(1).filter((row) => row[0]).map((row) => row[3]);
+            if (destination === updated.destination || JSON.stringify(winners) !== JSON.stringify(["999999"]) || !finalizedBytes.equals(readFileSync(updated.destination))) throw new Error("shutdown did not save the last result or overwrote the previous event");
+            clearTimeout(timeout);
+            process.stdout.write("SELF_TEST_OK: number keys, unique winners, blank group separators, same-file desktop autosave after every draw, count changes leave Excel untouched, upload transition saves before reset, and actual window close saves pending results while preserving the previous event\n");
+          } catch (error) {
+            event.preventDefault();
+            process.stdout.write(`SELF_TEST_FAILED: ${error.message}\n`);
+            app.exit(1);
+          }
+        });
+        window.close();
       }
     } catch (error) {
       clearTimeout(timeout);
@@ -702,8 +806,22 @@ app.whenReady().then(() => {
   });
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  if (quitApproved) return;
+  event.preventDefault();
+  if (quitSaving) return;
+  quitSaving = true;
   isQuitting = true;
+  finalizeWindows().then(() => {
+    quitApproved = true;
+    app.quit();
+  }).catch(() => {
+    quitSaving = false;
+    isQuitting = false;
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.executeJavaScript('typeof showStageStatus === "function" && showStageStatus("엑셀 저장에 실패해 종료하지 않았습니다. 파일을 확인한 뒤 다시 종료해주세요.")').catch(() => {});
+    }
+  });
 });
 
 app.on("window-all-closed", () => {

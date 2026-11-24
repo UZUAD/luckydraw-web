@@ -9,6 +9,7 @@
   <script src="vendor/draw-store.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="vendor/winner-export.js"></script>
+  <script src="vendor/winner-save.js"></script>
   <style>
     :root {
       --stage-scale: 1;
@@ -87,6 +88,8 @@
     .history-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; }
     .history-heading h2 { margin: 0; font-size: 1rem; font-weight: 700; }
     .history-total { margin-left: auto; font-size: .875rem; color: #d4d4d4; }
+    .save-status { font-size: .875rem; color: #d4d4d4; }
+    .save-status[data-state="error"] { color: #ffb9b9; }
     .export-button { padding: 6px 12px; border: 1px solid #777; border-radius: 6px; color: #fff; background: #262626; font: inherit; font-size: .875rem; cursor: pointer; }
     .export-button:disabled { opacity: .45; cursor: default; }
     .history-list { display: flex; gap: 24px; min-height: 0; margin: 0; padding: 0 0 4px; overflow: auto; list-style: none; }
@@ -113,7 +116,7 @@
 <body>
   <div class="stage"><div class="winner-grid" id="winnerGrid" aria-label="추첨 번호" aria-busy="false"></div></div>
   <aside class="history-panel" id="historyPanel" data-position="bottom" aria-label="누적 당첨 기록" hidden>
-    <div class="history-heading"><h2>당첨자 명단</h2><span class="history-total" id="historyTotal" aria-live="polite"></span><button class="export-button" id="exportWinners" type="button" aria-keyshortcuts="Control+S Meta+S">엑셀 저장</button></div>
+    <div class="history-heading"><h2>당첨자 명단</h2><span class="history-total" id="historyTotal" aria-live="polite"></span><span class="save-status" id="saveStatus" role="status">엑셀 자동저장 대기</span><button class="export-button" id="exportWinners" type="button" aria-keyshortcuts="Control+S Meta+S">엑셀 별도 저장</button></div>
     <ol class="history-list" id="historyList"></ol>
   </aside>
   <div class="stage-status" id="stageStatus" role="status" hidden></div>
@@ -142,17 +145,20 @@
     const settingsCount = document.getElementById("settingsCount");
     const settingsPrize = document.getElementById("settingsPrize");
     const exportButton = document.getElementById("exportWinners");
+    const saveStatus = document.getElementById("saveStatus");
     const settingsError = document.getElementById("settingsError");
     const stageStatus = document.getElementById("stageStatus");
     const confettiLayer = document.getElementById("confettiLayer");
     const fireConfetti = typeof confetti === "function" ? confetti.create(confettiLayer, { resize: true, useWorker: true }) : null;
     const store = LuckyDrawStore.create(localStorage);
+    const winnerSaver = LuckyDrawSave.create();
     const savedCount = Number(localStorage.getItem("luckydraw_count"));
     let drawCount = [1, 2, 3, 4].includes(savedCount) ? savedCount : 4;
     const drawLayout = "horizontal";
     let prizeName = localStorage.getItem("luckydraw_prize") || "럭키드로우";
     let state;
     let isPlaying = false;
+    let isPreparingDraw = false;
     let backgroundObjectUrl = null;
     let statusTimeout;
 
@@ -267,7 +273,7 @@
 
     function setDrawCount(count) {
       if (![1, 2, 3, 4].includes(count) || settingsDialog.open) return;
-      if (isPlaying) { showStageStatus("추첨이 끝난 뒤 번호판 개수를 바꿀 수 있습니다."); return; }
+      if (isPlaying || isPreparingDraw) { showStageStatus("추첨이 끝난 뒤 번호판 개수를 바꿀 수 있습니다."); return; }
       if (count === drawCount) return;
       try { savePreferences(countPreferences(count)); } catch {
         showStageStatus("번호판 개수를 저장하지 못했습니다. 저장 공간을 확인해주세요.");
@@ -292,6 +298,25 @@
     }
     exportButton.addEventListener("click", exportWinners);
 
+    async function saveAutomaticWinners({ force = false } = {}) {
+      const saved = store.load();
+      if (!saved.history.length) return true;
+      saveStatus.dataset.state = "saving";
+      saveStatus.textContent = "엑셀 자동저장 중";
+      try {
+        const result = await winnerSaver.save(saved.history, { force });
+        saveStatus.dataset.state = "saved";
+        saveStatus.textContent = result?.downloaded ? "엑셀 자동 다운로드 요청 완료" : "엑셀 자동저장 완료";
+        return true;
+      } catch (error) {
+        saveStatus.dataset.state = "error";
+        saveStatus.textContent = "엑셀 자동저장 실패";
+        showStageStatus(error.message || "엑셀을 저장하지 못했습니다. 당첨 기록은 앱에 보관되어 있습니다.");
+        return false;
+      }
+    }
+    window.finalizeWinnerSave = () => saveAutomaticWinners({ force: true });
+
     function showStageStatus(message) {
       clearTimeout(statusTimeout);
       stageStatus.textContent = message;
@@ -300,7 +325,7 @@
     }
 
     function toggleSettings() {
-      if (isPlaying) {
+      if (isPlaying || isPreparingDraw) {
         showStageStatus("추첨 중에는 설정을 변경할 수 없습니다. 추첨이 끝난 뒤 F2를 눌러주세요.");
         return;
       }
@@ -316,7 +341,7 @@
     document.getElementById("closeSettings").addEventListener("click", () => settingsDialog.close());
     document.getElementById("settingsForm").addEventListener("submit", (event) => {
       event.preventDefault();
-      if (isPlaying || !settingsDialog.open) return;
+      if (isPlaying || isPreparingDraw || !settingsDialog.open) return;
       const count = Number(settingsCount.value);
       if (![1, 2, 3, 4].includes(count)) return;
       const prize = settingsPrize.value.trim().slice(0, 80);
@@ -342,10 +367,24 @@
     function wait(milliseconds) { return new Promise((resolve) => setTimeout(resolve, milliseconds)); }
 
     async function startDraw() {
-      if (isPlaying || settingsDialog.open || !state) return;
+      if (isPlaying || isPreparingDraw || settingsDialog.open || !state) return;
       if (state.remaining.length < drawCount) {
         showStageStatus(`남은 참가자는 ${state.remaining.length}명입니다. F2 설정에서 추첨 개수를 줄여주세요.`);
         return;
+      }
+      if (location.protocol !== "luckydraw:") {
+        isPreparingDraw = true;
+        try {
+          if (!await winnerSaver.prepare()) {
+            showStageStatus("엑셀 저장 위치를 선택한 뒤 추첨을 시작해주세요.");
+            return;
+          }
+        } catch (error) {
+          showStageStatus(error.message || "엑셀 저장 위치를 선택하지 못했습니다.");
+          return;
+        } finally {
+          isPreparingDraw = false;
+        }
       }
       let result;
       const separateBefore = state.history.length > 0 && Number(localStorage.getItem("luckydraw_export_break_after")) === state.history.length;
@@ -384,6 +423,7 @@
       isPlaying = false;
       exportButton.disabled = false;
       playConfetti();
+      await saveAutomaticWinners();
     }
 
     document.addEventListener("keydown", (event) => {
@@ -424,6 +464,7 @@
       const lastRound = state.history.at(-1);
       renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
       renderHistory();
+      if (state.history.length) void saveAutomaticWinners();
     } catch {
       alert("저장된 추첨 데이터를 불러오지 못했습니다. 참가자를 다시 등록해주세요.");
       location.replace("upload.html");
