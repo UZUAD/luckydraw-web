@@ -281,7 +281,6 @@
       drawCount = count;
       const lastRound = state?.history.at(-1);
       renderCards(drawCount, lastRound?.winners.length === drawCount ? lastRound.winners : []);
-      showStageStatus(`${count}개 동시 추첨으로 변경했습니다.`);
     }
 
     function exportWinners() {
