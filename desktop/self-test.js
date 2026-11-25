@@ -22,6 +22,40 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
     await fs.mkdir(captureDir, { recursive: true });
     await fs.writeFile(path.join(captureDir, name), (await window.webContents.capturePage()).toPNG());
   };
+  const backgroundUploadScript = `window.__uploadBackground = async (file) => {
+    await window.luckyDrawBackgroundSettingsReady;
+    const input = document.getElementById("backgroundFile");
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change"));
+    while (input.value) await new Promise(resolve => setTimeout(resolve, 20));
+    const video = document.getElementById("backgroundPreviewVideo");
+    while (!video.hidden && video.readyState < 2 && !video.error) await new Promise(resolve => setTimeout(resolve, 20));
+    const record = await LuckyDrawBackground.get();
+    return { name: record?.name, type: record?.type, video: !video.hidden && !video.paused && video.muted && video.loop && video.videoWidth > 0,
+      image: video.hidden && video.paused && !video.hasAttribute("src") && document.getElementById("backgroundPreview").style.backgroundImage !== "none",
+      error: document.getElementById("feedbackModal").getAttribute("aria-hidden") === "false" };
+  }; void 0;`;
+  const imageUploadScript = `(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 32; canvas.height = 18;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#123456";
+    context.fillRect(0, 0, 32, 18);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+    return __uploadBackground(new File([blob], "background.png", {type:"image/png"}));
+  })()`;
+  const fileScript = (bytes, name, type) => `new File([Uint8Array.from(atob(${JSON.stringify(bytes.toString("base64"))}), c => c.charCodeAt(0))], ${JSON.stringify(name)}, {type:${JSON.stringify(type)}})`;
+  const assertVideo = async (fit) => {
+    assert.deepEqual(await evaluate(`(() => {
+      const video = document.getElementById("backgroundVideo");
+      const bounds = video.getBoundingClientRect();
+      return {playing: !video.hidden && !video.paused && !video.ended && video.videoWidth > 0, muted: video.muted, loop: video.loop,
+        controls: video.controls, fit: getComputedStyle(video).objectFit, fillsStage: bounds.width === innerWidth && bounds.height === innerHeight,
+        digitsAbove: getComputedStyle(document.getElementById("winnerGrid")).zIndex === "1"};
+    })()`), {playing:true, muted:true, loop:true, controls:false, fit, fillsStage:true, digitsAbove:true});
+  };
 
   try {
     await fs.mkdir(desktop, { recursive: true });
@@ -33,16 +67,29 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
     assert.equal(path.basename(first), "luckydraw_sample.xlsx");
     assert.equal(path.basename(second), "luckydraw_sample (2).xlsx");
     const sample = await fs.readFile(first);
+    const mp4 = await fs.readFile(path.join(__dirname, "fixtures/background.mp4"));
+    const webm = await fs.readFile(path.join(__dirname, "fixtures/background.webm"));
+    await evaluate(backgroundUploadScript);
+    assert.equal((await evaluate(imageUploadScript)).image, true, "image upload must still work");
+    for (const [bytes, name, type] of [[webm, "background.webm", "video/webm"], [mp4, "background.mp4", ""]]) {
+      const result = await evaluate(`__uploadBackground(${fileScript(bytes, name, type)})`);
+      assert.equal(result.name, name);
+      assert.equal(result.video, true, `${name} must autoplay silently in the preview`);
+      assert.equal(result.error, false);
+      assert.equal(result.type, name.endsWith("mp4") ? "video/mp4" : "video/webm");
+    }
+    for (const [name, type] of [["broken.mp4", "video/mp4"], ["unsupported.txt", "text/plain"]]) {
+      const result = await evaluate(`__uploadBackground(new File(["invalid media"], ${JSON.stringify(name)}, {type:${JSON.stringify(type)}}))`);
+      assert.equal(result.error, true);
+      assert.equal(result.name, "background.mp4", "rejected files must preserve the previous background");
+      assert.equal(result.video, true);
+      await evaluate('document.getElementById("feedbackModalButton").click()');
+    }
+    await evaluate(`document.getElementById("backgroundFit").value = "contain"; document.getElementById("backgroundFit").dispatchEvent(new Event("change"));`);
+    await snapshot("upload-video.png");
     const registration = await evaluate(`(async () => {
       window.__saveRequests = 0;
       window.showSaveFilePicker = () => { window.__saveRequests++; throw new Error("Unexpected file permission request"); };
-      const canvas = document.createElement("canvas");
-      canvas.width = 32; canvas.height = 18;
-      const context = canvas.getContext("2d");
-      context.fillStyle = "#123456";
-      context.fillRect(0, 0, 32, 18);
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
-      await LuckyDrawBackground.save(new File([blob], "background.png", {type:"image/png"}));
       document.getElementById("rangeTab").click();
       document.getElementById("startNumber").value = "99999";
       document.getElementById("endNumber").value = "100001";
@@ -75,6 +122,17 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
     await evaluate('document.getElementById("feedbackModalButton").click()');
     await drawLoaded;
     await evaluate("window.luckyDrawBackgroundReady");
+    await assertVideo("contain");
+    assert.deepEqual(await evaluate(`(async () => {
+      const video = document.getElementById("backgroundVideo");
+      const before = video.currentTime;
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const moving = video.currentTime !== before;
+      await new Promise(resolve => { video.addEventListener("seeked", resolve, {once:true}); video.currentTime = video.duration - .15; });
+      while (video.currentTime > video.duration / 2) await new Promise(resolve => setTimeout(resolve, 20));
+      return {moving, looped: !video.paused && !video.ended};
+    })()`), {moving:true, looped:true}, "the background must advance frames and loop after the end");
+    await snapshot("draw-video.png");
     assert.equal(await evaluate(`(() => {
       window.__saveRequests = 0;
       window.showSaveFilePicker = () => { window.__saveRequests++; throw new Error("Unexpected file permission request"); };
@@ -143,15 +201,30 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
     window.webContents.reload();
     await reloaded;
     await evaluate("window.luckyDrawBackgroundReady");
+    await assertVideo("contain");
     assert.deepEqual(await evaluate("store.load().history"), saved.history);
     assert.equal(await evaluate("drawCount"), 2);
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".digits-wrapper")].map(panel => panel.textContent)'), saved.history.at(-1).winners);
+    await evaluate(`(async () => {
+      await LuckyDrawBackground.save(${fileScript(webm, "background.webm", "video/webm")});
+      localStorage.setItem("luckydraw_background_fit", "cover");
+      await loadEventBackground();
+    })()`);
+    await assertVideo("cover");
     await window.loadURL("luckydraw://app/upload.html");
     assert.equal(await evaluate("window.eventInitialization"), true);
     const reset = await evaluate("LuckyDrawStore.create(localStorage).load()");
     assert.deepEqual(reset.participants, []);
     assert.deepEqual(reset.history, []);
     assert.equal(await evaluate("localStorage.getItem('luckydraw_count')"), "4");
+    await evaluate(backgroundUploadScript);
+    assert.equal((await evaluate(imageUploadScript)).image, true, "switching from video to image must release the video");
+    assert.equal(await evaluate(`(async () => {
+      document.getElementById("removeBackgroundButton").click();
+      while (!document.getElementById("removeBackgroundButton").disabled) await new Promise(resolve => setTimeout(resolve, 20));
+      const video = document.getElementById("backgroundPreviewVideo");
+      return !(await LuckyDrawBackground.get()) && video.hidden && video.paused && !video.hasAttribute("src") && !document.getElementById("backgroundPreviewEmpty").hidden;
+    })()`), true, "deleting a background must clear its stored file and preview");
     assert.deepEqual(downloads, []);
     app.once("will-quit", (event) => {
       try {
@@ -159,7 +232,7 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
         assert.equal(readFileSync(marker, "utf8"), "preserve existing file");
         assert.deepEqual(downloads, []);
         clearTimeout(timeout);
-        process.stdout.write("SELF_TEST_OK: 100-person Excel upload, number keys and Enter, repeat draws beyond exhaustion, responsive layouts, reload recovery, no export UI or permission requests, and no winner files on navigation or shutdown\n");
+        process.stdout.write("SELF_TEST_OK: image/MP4/WebM uploads, muted autoplay and looping, invalid-file recovery, background replacement/deletion, 100-person Excel upload, number keys and Enter, repeat draws, responsive layouts, reload recovery, and no winner files or permission requests\n");
       } catch (error) {
         event.preventDefault();
         process.stdout.write(`SELF_TEST_FAILED: ${error.message}\n`);

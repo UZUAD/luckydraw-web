@@ -4,6 +4,42 @@
   const DATABASE_NAME = "luckydraw_settings";
   const STORE_NAME = "assets";
   const BACKGROUND_KEY = "event_background";
+  const MEDIA_TYPES = {
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
+    mp4: "video/mp4", webm: "video/webm"
+  };
+
+  function mediaType(file) {
+    const type = file.type || file.blob?.type || "";
+    if (type && type !== "application/octet-stream") {
+      return Object.values(MEDIA_TYPES).includes(type) ? type : "";
+    }
+    return MEDIA_TYPES[(file.name || "").split(".").pop().toLowerCase()] || "";
+  }
+
+  function validateVideo(blob) {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement("video");
+      const url = URL.createObjectURL(blob);
+      const finish = (error) => {
+        clearTimeout(timeout);
+        video.onloadeddata = null;
+        video.onerror = null;
+        video.removeAttribute("src");
+        video.load();
+        URL.revokeObjectURL(url);
+        if (error) reject(error); else resolve();
+      };
+      const unsupported = () => finish(new DOMException("재생할 수 없는 영상입니다. MP4(H.264) 또는 WebM 영상을 선택해주세요.", "NotSupportedError"));
+      const timeout = setTimeout(unsupported, 15000);
+      video.muted = true;
+      video.preload = "auto";
+      video.onloadeddata = () => finish();
+      video.onerror = unsupported;
+      video.src = url;
+      video.load();
+    });
+  }
 
   function openDatabase() {
     return new Promise((resolve, reject) => {
@@ -29,10 +65,11 @@
       const store = transaction.objectStore(STORE_NAME);
       const request = operation(store);
 
-      request.onsuccess = () => resolve(request.result);
+      let result;
+      request.onsuccess = () => { result = request.result; };
       request.onerror = () => reject(request.error);
-      transaction.oncomplete = () => database.close();
-      transaction.onerror = () => reject(transaction.error);
+      transaction.oncomplete = () => { database.close(); resolve(result); };
+      transaction.onabort = () => { database.close(); reject(transaction.error); };
     });
   }
 
@@ -40,11 +77,15 @@
     return runTransaction("readonly", (store) => store.get(BACKGROUND_KEY));
   }
 
-  function saveBackground(file) {
+  async function saveBackground(file) {
+    const type = mediaType(file);
+    if (!type) throw new DOMException("PNG, JPG, WebP 이미지 또는 MP4, WebM 영상을 선택해주세요.", "NotSupportedError");
+    const blob = file.type === type ? file : file.slice(0, file.size, type);
+    if (type.startsWith("video/")) await validateVideo(blob);
     const record = {
-      blob: file,
-      name: file.name || "행사 배경 이미지",
-      type: file.type,
+      blob,
+      name: file.name || "행사 배경",
+      type,
       size: file.size,
       updatedAt: Date.now()
     };
@@ -57,6 +98,7 @@
   }
 
   window.LuckyDrawBackground = {
+    mediaType,
     get: getBackground,
     save: saveBackground,
     remove: removeBackground

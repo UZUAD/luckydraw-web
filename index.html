@@ -21,8 +21,10 @@
     html, body { margin: 0; width: 100%; height: 100%; }
     body { overflow: hidden; color: #fff; background: #000; }
     .stage { position: fixed; inset: 0; z-index: 1; overflow: hidden; background: #000 center / cover no-repeat; }
+    .background-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
     .winner-grid {
       position: absolute;
+      z-index: 1;
       left: 50%;
       top: calc(50% - (20px * var(--stage-scale)));
       display: grid;
@@ -84,7 +86,10 @@
   </style>
 </head>
 <body>
-  <div class="stage"><div class="winner-grid" id="winnerGrid" aria-label="추첨 번호" aria-busy="false"></div></div>
+  <div class="stage">
+    <video class="background-video" id="backgroundVideo" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-hidden="true" tabindex="-1" hidden></video>
+    <div class="winner-grid" id="winnerGrid" aria-label="추첨 번호" aria-busy="false"></div>
+  </div>
   <div class="stage-status" id="stageStatus" role="status" hidden></div>
   <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle" aria-describedby="settingsDescription" aria-keyshortcuts="F2">
     <form id="settingsForm">
@@ -104,6 +109,7 @@
   <canvas class="confetti-layer" id="confettiLayer" aria-hidden="true"></canvas>
   <script>
     const stage = document.querySelector(".stage");
+    const backgroundVideo = document.getElementById("backgroundVideo");
     const grid = document.getElementById("winnerGrid");
     const settingsDialog = document.getElementById("settingsDialog");
     const settingsCount = document.getElementById("settingsCount");
@@ -143,21 +149,45 @@
       grid.dataset.layout = drawLayout;
     }
 
+    function clearEventBackground() {
+      backgroundVideo.pause();
+      backgroundVideo.hidden = true;
+      backgroundVideo.removeAttribute("src");
+      backgroundVideo.load();
+      stage.style.backgroundImage = "none";
+      if (backgroundObjectUrl) URL.revokeObjectURL(backgroundObjectUrl);
+      backgroundObjectUrl = null;
+    }
+
     async function loadEventBackground() {
-      stage.style.backgroundSize = localStorage.getItem("luckydraw_background_fit") === "contain" ? "contain" : "cover";
+      clearEventBackground();
+      const fit = localStorage.getItem("luckydraw_background_fit") === "contain" ? "contain" : "cover";
+      stage.style.backgroundSize = fit;
+      backgroundVideo.style.objectFit = fit;
       try {
         const record = await LuckyDrawBackground.get();
         if (!record || !record.blob) return;
-        if (backgroundObjectUrl) URL.revokeObjectURL(backgroundObjectUrl);
         backgroundObjectUrl = URL.createObjectURL(record.blob);
-        stage.style.backgroundImage = `url(${JSON.stringify(backgroundObjectUrl)})`;
+        if (LuckyDrawBackground.mediaType(record).startsWith("video/")) {
+          backgroundVideo.muted = true;
+          backgroundVideo.src = backgroundObjectUrl;
+          backgroundVideo.hidden = false;
+          await backgroundVideo.play();
+        } else {
+          stage.style.backgroundImage = `url(${JSON.stringify(backgroundObjectUrl)})`;
+        }
         updateStageScale();
-      } catch { stage.style.backgroundImage = "none"; }
+      } catch {
+        clearEventBackground();
+        showStageStatus("배경을 불러오지 못했습니다. 등록 화면에서 배경 파일을 다시 선택해주세요.");
+      }
     }
+    backgroundVideo.addEventListener("error", () => showStageStatus("배경 영상을 재생하지 못했습니다. 등록 화면에서 다른 영상을 선택해주세요."));
     window.luckyDrawBackgroundReady = loadEventBackground();
     window.addEventListener("resize", updateStageScale);
     document.addEventListener("fullscreenchange", updateStageScale);
-    window.addEventListener("pagehide", () => { if (backgroundObjectUrl) URL.revokeObjectURL(backgroundObjectUrl); });
+    window.addEventListener("pagehide", clearEventBackground);
+    window.addEventListener("pageshow", (event) => { if (event.persisted) window.luckyDrawBackgroundReady = loadEventBackground(); });
 
     function renderCards(count, winners = []) {
       grid.replaceChildren();
