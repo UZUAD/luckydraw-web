@@ -86,6 +86,7 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
       await evaluate('document.getElementById("feedbackModalButton").click()');
     }
     await evaluate(`document.getElementById("backgroundFit").value = "contain"; document.getElementById("backgroundFit").dispatchEvent(new Event("change"));`);
+    await evaluate('document.getElementById("backgroundSettingsTitle").scrollIntoView({block:"center"})');
     await snapshot("upload-video.png");
     const registration = await evaluate(`(async () => {
       window.__saveRequests = 0;
