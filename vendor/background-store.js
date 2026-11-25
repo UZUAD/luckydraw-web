@@ -6,13 +6,13 @@
   const BACKGROUND_KEY = "event_background";
   const MEDIA_TYPES = {
     png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
-    mp4: "video/mp4", webm: "video/webm"
+    mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", m4v: "video/mp4"
   };
 
   function mediaType(file) {
     const type = file.type || file.blob?.type || "";
     if (type && type !== "application/octet-stream") {
-      return Object.values(MEDIA_TYPES).includes(type) ? type : "";
+      return Object.values(MEDIA_TYPES).includes(type) || /^video\//.test(type) ? type : "";
     }
     return MEDIA_TYPES[(file.name || "").split(".").pop().toLowerCase()] || "";
   }
@@ -79,7 +79,7 @@
 
   async function saveBackground(file) {
     const type = mediaType(file);
-    if (!type) throw new DOMException("PNG, JPG, WebP 이미지 또는 MP4, WebM 영상을 선택해주세요.", "NotSupportedError");
+    if (!type) throw new DOMException("PNG, JPG, WebP 이미지 또는 영상 파일을 선택해주세요.", "NotSupportedError");
     const blob = file.type === type ? file : file.slice(0, file.size, type);
     if (type.startsWith("video/")) await validateVideo(blob);
     const record = {

@@ -303,7 +303,7 @@
       justify-content: flex-start;
       gap: 12px;
       margin-bottom: 12px;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
     }
 
     .field-head label {
@@ -335,9 +335,13 @@
     .file-badge {
       position: relative;
       display: inline-flex;
+      align-items: center;
+      justify-content: center;
       flex-shrink: 0;
-      width: 112px;
+      min-width: 112px;
       height: 42px;
+      padding: 0 18px;
+      white-space: nowrap;
       border-radius: 14px;
       background: linear-gradient(180deg, #eef4ff 0%, #dfeaff 100%);
       border: 1px solid rgba(31, 111, 255, 0.08);
@@ -360,8 +364,6 @@
     }
 
     .file-badge span {
-      position: absolute;
-      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -559,16 +561,6 @@
       transform: translateY(0);
     }
 
-    .footer-note {
-      margin-top: 18px;
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: var(--success-soft);
-      color: #287257;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -740,7 +732,7 @@
         <div class="rules">
           <div class="rule-item">
             <strong>1. 데이터 시작 위치</strong>
-            <p>A1에는 헤더가 있고, 실제 데이터는 A2부터 시작해야 합니다.</p>
+            <p>첫 번째 행에 헤더를 넣고, 두 번째 행부터 데이터를 입력해주세요. 번호 컬럼은 어느 열에 있어도 됩니다.</p>
           </div>
 
           <div class="rule-item">
@@ -790,13 +782,14 @@
 
             <div class="field upload-file-field">
               <div class="field-head">
-                <label for="excelFile">업로드 파일</label>
+                <label for="excelFile">참가자 엑셀 / 배경 파일</label>
                 <label class="file-badge" for="excelFile"><span>파일 선택</span></label>
               </div>
               <div class="file-picker">
                 <span class="file-message" id="fileMessage">선택된 파일이 없습니다.</span>
               </div>
-              <input class="hidden-file" type="file" id="excelFile" accept=".xlsx" />
+              <input class="hidden-file" type="file" id="excelFile" accept=".xlsx,image/png,image/jpeg,image/webp,video/*,.png,.jpg,.jpeg,.webp,.mp4,.webm,.mov,.m4v" />
+              <div class="field-hint">엑셀은 참가자 명단으로, 이미지·영상은 행사 배경으로 등록합니다.</div>
             </div>
           </div>
 
@@ -839,14 +832,14 @@
             </div>
             <div class="background-controls">
               <label class="file-badge" for="backgroundFile"><span>이미지 / 영상 선택</span></label>
-              <input class="hidden-file" type="file" id="backgroundFile" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,.png,.jpg,.jpeg,.webp,.mp4,.webm" />
+              <input class="hidden-file" type="file" id="backgroundFile" accept="image/png,image/jpeg,image/webp,video/*,.png,.jpg,.jpeg,.webp,.mp4,.webm,.mov,.m4v" />
               <select class="select-input" id="backgroundFit" aria-label="배경 표시 방식">
                 <option value="cover">화면 채우기</option>
                 <option value="contain">전체 배경 보기</option>
               </select>
               <button class="secondary-btn" id="removeBackgroundButton" type="button" disabled>배경 삭제</button>
             </div>
-            <div class="background-message" id="backgroundMessage">PNG, JPG, WebP 이미지와 MP4, WebM 영상을 저장해 오프라인으로 사용합니다. 영상은 무음으로 자동 반복 재생됩니다.</div>
+            <div class="background-message" id="backgroundMessage">PNG, JPG, WebP 이미지와 이 브라우저에서 재생 가능한 영상을 사용할 수 있습니다. 영상은 무음으로 자동 반복 재생됩니다.</div>
           </section>
 
           <div class="quick-guide" id="excelQuickGuide">
@@ -864,10 +857,6 @@
           <button class="submit-btn" id="submitButton" type="button">엑셀 업로드하고 추첨 화면으로 이동</button>
         </div>
 
-        <div class="footer-note">
-          등록하고 추첨 화면으로 이동 버튼을 누르면 참가자 번호가 저장되고, 바로 추첨 화면으로 이동합니다.
-          <br />이 화면을 다시 열면 참가자와 이전 추첨 기록을 초기화하고 새 행사를 시작합니다.
-        </div>
       </article>
     </section>
   </div>
@@ -910,6 +899,8 @@
     let activeMode = "excel";
     let modalCloseHandler = null;
     let backgroundPreviewUrl = null;
+    let selectedExcelFile = null;
+    let backgroundSaving = false;
     let eventStarting = true;
     let eventReady = false;
 
@@ -927,7 +918,7 @@
         showFeedbackModal("새 추첨을 시작하지 못했습니다. 브라우저 저장 공간을 확인한 뒤 이 화면을 다시 열어주세요.");
       } finally {
         eventStarting = false;
-        submitButton.disabled = !eventReady;
+        submitButton.disabled = !eventReady || backgroundSaving;
       }
       return eventReady;
     }
@@ -958,7 +949,7 @@
 
       if (!record || !record.blob) {
         backgroundPreviewEmpty.hidden = false;
-        backgroundMessage.textContent = "PNG, JPG, WebP 이미지와 MP4, WebM 영상을 저장해 오프라인으로 사용합니다. 영상은 무음으로 자동 반복 재생됩니다.";
+        backgroundMessage.textContent = "PNG, JPG, WebP 이미지와 이 브라우저에서 재생 가능한 영상을 사용할 수 있습니다. 영상은 무음으로 자동 반복 재생됩니다.";
         removeBackgroundButton.disabled = true;
         return;
       }
@@ -1000,41 +991,49 @@
       backgroundPreviewVideo.style.objectFit = backgroundFitSelect.value;
     });
 
-    backgroundFileInput.addEventListener("change", async () => {
-      const file = backgroundFileInput.files[0];
-      if (!file) return;
-      await window.luckyDrawBackgroundSettingsReady;
-
+    async function saveBackgroundFile(file) {
+      if (!file || backgroundSaving) return false;
       if (!LuckyDrawBackground.mediaType(file)) {
-        backgroundFileInput.value = "";
-        showFeedbackModal("PNG, JPG, WebP 이미지 또는 MP4, WebM 영상을 선택해주세요.");
-        return;
+        showFeedbackModal("PNG, JPG, WebP 이미지 또는 영상 파일을 선택해주세요.");
+        return false;
       }
 
       const previousMessage = backgroundMessage.textContent;
       const wasRemoveDisabled = removeBackgroundButton.disabled;
+      backgroundSaving = true;
+      fileInput.disabled = true;
       backgroundFileInput.disabled = true;
       removeBackgroundButton.disabled = true;
       submitButton.disabled = true;
       try {
+        await window.luckyDrawBackgroundSettingsReady;
         backgroundMessage.textContent = "배경 파일을 확인하고 저장하고 있습니다…";
         await LuckyDrawBackground.save(file);
         setBackgroundPreview(await LuckyDrawBackground.get());
+        return true;
       } catch (error) {
         backgroundMessage.textContent = previousMessage;
         removeBackgroundButton.disabled = wasRemoveDisabled;
         showFeedbackModal(error.name === "NotSupportedError" ? error.message : "배경을 저장하지 못했습니다. 저장 공간을 확인하거나 더 작은 파일을 선택해주세요.");
+        return false;
       } finally {
-        backgroundFileInput.value = "";
+        backgroundSaving = false;
+        fileInput.disabled = false;
         backgroundFileInput.disabled = false;
         submitButton.disabled = eventStarting || !eventReady;
       }
+    }
+
+    backgroundFileInput.addEventListener("change", async () => {
+      await saveBackgroundFile(backgroundFileInput.files[0]);
+      backgroundFileInput.value = "";
     });
 
     removeBackgroundButton.addEventListener("click", async () => {
       try {
         await LuckyDrawBackground.remove();
         setBackgroundPreview(null);
+        updateFileMessage(selectedExcelFile ? `참가자 명단: ${selectedExcelFile.name}` : "선택된 참가자 엑셀이 없습니다.");
       } catch {
         showFeedbackModal("배경을 삭제하지 못했습니다.");
       }
@@ -1093,7 +1092,7 @@
     function updateSubmitState() {
       if (activeMode === "excel") {
         submitButton.textContent = "엑셀 업로드하고 추첨 화면으로 이동";
-        submitButton.classList.toggle("is-complete", Boolean(fileInput.files[0]));
+        submitButton.classList.toggle("is-complete", Boolean(selectedExcelFile));
         return;
       }
 
@@ -1121,23 +1120,28 @@
       tab.addEventListener("click", () => selectRegistrationMode(tab.dataset.mode));
     });
 
-    fileInput.addEventListener("change", () => {
+    fileInput.addEventListener("change", async () => {
       const file = fileInput.files[0];
-      if (!file) {
-        updateFileMessage("선택된 파일이 없습니다.");
-        submitButton.classList.remove("is-complete");
+      if (!file) return;
+
+      if (file.name.toLowerCase().endsWith(".xlsx")) {
+        selectedExcelFile = file;
+        updateFileMessage(`참가자 명단: ${file.name}`);
+        updateSubmitState();
         return;
       }
 
-      if (!file.name.toLowerCase().endsWith(".xlsx")) {
-        fileInput.value = "";
-        updateFileMessage(".xlsx 형식만 업로드할 수 있습니다.");
-        submitButton.classList.remove("is-complete");
+      fileInput.value = "";
+      if (!LuckyDrawBackground.mediaType(file)) {
+        showFeedbackModal("참가자 엑셀(.xlsx), 이미지 또는 영상 파일을 선택해주세요.");
         return;
       }
 
-      updateFileMessage(file.name);
-      updateSubmitState();
+      if (await saveBackgroundFile(file)) {
+        updateFileMessage(selectedExcelFile ? `참가자 명단: ${selectedExcelFile.name} · 배경: ${file.name}` : `배경: ${file.name} · 참가자 엑셀을 선택하거나 번호 범위를 입력해주세요.`);
+        updateSubmitState();
+        document.getElementById("backgroundSettingsTitle").scrollIntoView({behavior:"smooth", block:"center"});
+      }
     });
 
     function formatParticipantNumber(value) {
@@ -1178,7 +1182,7 @@
 
     function updateRangePreview() {
       const { start, end, error } = getNumberRange();
-      rangePreview.textContent = error || `${formatParticipantNumber(start)}부터 ${formatParticipantNumber(end)}까지 총 ${(end - start + 1).toLocaleString("ko-KR")}개 번호가 등록됩니다.`;
+      rangePreview.textContent = error || `${formatParticipantNumber(start)}부터 ${formatParticipantNumber(end)}까지 제외 전 총 ${(end - start + 1).toLocaleString("ko-KR")}개 번호입니다.`;
       updateSubmitState();
     }
 
@@ -1230,6 +1234,7 @@
     }
 
     submitButton.addEventListener("click", () => {
+      if (backgroundSaving || eventStarting || !eventReady) return;
       if (activeMode === "range") {
         registerNumberRange();
         return;
@@ -1239,7 +1244,7 @@
     });
 
     function uploadExcel() {
-      const file = fileInput.files[0];
+      const file = selectedExcelFile;
 
       if (!file) {
         submitButton.classList.remove("is-complete");
