@@ -163,11 +163,38 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
           const panels = [...document.querySelectorAll(".digits-wrapper")].map(panel => panel.getBoundingClientRect());
           if (drawCount !== count || panels.length !== count || panels.some(panel => panel.left < 0 || panel.top < 0 || panel.right > innerWidth || panel.bottom > innerHeight) ||
               !stageStatus.hidden || before !== localStorage.getItem(LuckyDrawStore.STATE_KEY)) failures.push(count);
+          if (innerWidth === 5000 && innerHeight === 1200 && panels.some(panel => Math.abs(innerHeight - panel.bottom - 515) > .1)) failures.push("LCD bottom gap " + count);
         }
         return failures;
       })()`);
       assert.deepEqual(result, [], `layout failed at ${width}x${height}`);
     }
+    window.setContentSize(1280, 720);
+    const fixedLcdBottom = await evaluate(`(() => {
+      const previousSize = localStorage.getItem(LuckyDrawScreen.STORAGE_KEY);
+      const before = localStorage.getItem(LuckyDrawStore.STATE_KEY);
+      const failures = [];
+      try {
+        LuckyDrawScreen.save(localStorage, {width:5000, height:1200});
+        for (const count of [1, 2, 3, 4]) {
+          document.dispatchEvent(new KeyboardEvent("keydown", {key:String(count)}));
+          const frame = stage.getBoundingClientRect();
+          const previewScale = frame.height / 1200;
+          for (const panel of grid.children) {
+            const bounds = panel.getBoundingClientRect();
+            const bottomGap = (frame.bottom - bounds.bottom) / previewScale;
+            if (Math.abs(bottomGap - 515) > .1 || bounds.top < frame.top || bounds.bottom > frame.bottom) failures.push(count);
+          }
+        }
+        if (before !== localStorage.getItem(LuckyDrawStore.STATE_KEY)) failures.push("draw state changed");
+      } finally {
+        if (previousSize === null) localStorage.removeItem(LuckyDrawScreen.STORAGE_KEY);
+        else localStorage.setItem(LuckyDrawScreen.STORAGE_KEY, previousSize);
+        updateStageScale();
+      }
+      return failures;
+    })()`);
+    assert.deepEqual(fixedLcdBottom, [], "LCD panels must remain 515px above the stage bottom when previewed in a smaller window");
     window.setContentSize(2304, 640);
     const pressEnter = async (expectedTotal) => {
       window.webContents.sendInputEvent({ type: "keyDown", keyCode: "Enter" });

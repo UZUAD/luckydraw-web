@@ -153,7 +153,9 @@
       grid.style.setProperty("--columns", String(count));
       grid.style.setProperty("--panel-gap", `${panelGap}px`);
       const preferredCenter = count === 1 ? screenHeight * .5 - 20 * scale : screenHeight * .56;
-      const center = Math.max(height * scale / 2 + 8, Math.min(preferredCenter, contentBottom - height * scale / 2 - 16));
+      const center = screenWidth === 5000 && screenHeight === 1200
+        ? contentBottom - 515 - height * scale / 2
+        : Math.max(height * scale / 2 + 8, Math.min(preferredCenter, contentBottom - height * scale / 2 - 16));
       grid.style.top = `${center}px`;
       grid.dataset.layout = drawLayout;
     }
