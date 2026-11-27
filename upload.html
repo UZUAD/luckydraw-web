@@ -867,14 +867,14 @@
 
             <div class="field upload-file-field">
               <div class="field-head">
-                <label for="excelFile">참가자 엑셀 / 배경 파일</label>
+                <label for="excelFile">참가자 엑셀</label>
                 <label class="file-badge" for="excelFile"><span>파일 선택</span></label>
               </div>
               <div class="file-picker">
                 <span class="file-message" id="fileMessage">선택된 파일이 없습니다.</span>
               </div>
-              <input class="hidden-file" type="file" id="excelFile" accept=".xlsx,image/png,image/jpeg,image/webp,video/*,.png,.jpg,.jpeg,.webp,.mp4,.webm,.mov,.m4v" />
-              <div class="field-hint">엑셀은 참가자 명단으로, 이미지·영상은 행사 배경으로 등록합니다.</div>
+              <input class="hidden-file" type="file" id="excelFile" accept=".xlsx" />
+              <div class="field-hint">참가자 명단은 엑셀(.xlsx) 파일로 등록합니다.</div>
             </div>
           </div>
 
@@ -1249,7 +1249,7 @@
       tab.addEventListener("click", () => selectRegistrationMode(tab.dataset.mode));
     });
 
-    fileInput.addEventListener("change", async () => {
+    fileInput.addEventListener("change", () => {
       const file = fileInput.files[0];
       if (!file) return;
 
@@ -1261,16 +1261,7 @@
       }
 
       fileInput.value = "";
-      if (!LuckyDrawBackground.mediaType(file)) {
-        showFeedbackModal("참가자 엑셀(.xlsx), 이미지 또는 영상 파일을 선택해주세요.");
-        return;
-      }
-
-      if (await saveBackgroundFile(file)) {
-        updateFileMessage(selectedExcelFile ? `참가자 명단: ${selectedExcelFile.name} · 배경: ${file.name}` : `배경: ${file.name} · 참가자 엑셀을 선택하거나 번호 범위를 입력해주세요.`);
-        updateSubmitState();
-        document.getElementById("backgroundSettingsTitle").scrollIntoView({behavior:"smooth", block:"center"});
-      }
+      showFeedbackModal("참가자 엑셀(.xlsx) 파일만 선택해주세요.");
     });
 
     function formatParticipantNumber(value) {

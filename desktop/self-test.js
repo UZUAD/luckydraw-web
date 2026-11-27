@@ -79,14 +79,25 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
       document.getElementById("excelFile").files = transfer.files;
       document.getElementById("excelFile").dispatchEvent(new Event("change"));
     })()`);
-    for (const [bytes, name, type, inputId] of [[mov, "recording.mov", "video/quicktime", "excelFile"], [webm, "background.webm", "video/webm", "backgroundFile"], [mp4, "background.mp4", "", "excelFile"]]) {
-      const result = await evaluate(`__uploadBackground(${fileScript(bytes, name, type)}, ${JSON.stringify(inputId)})`);
+    assert.equal(await evaluate('document.getElementById("excelFile").accept'), ".xlsx", "the participant picker must only offer Excel files");
+    const beforeRejectedFiles = await evaluate(`(async () => ({background:(await LuckyDrawBackground.get()).updatedAt, drawState:localStorage.getItem(LuckyDrawStore.STATE_KEY)}))()`);
+    for (const [name, type] of [["image.png", "image/png"], ["clip.mp4", "video/mp4"], ["recording.mov", "video/quicktime"], ["notes.txt", "text/plain"], ["legacy.xls", "application/vnd.ms-excel"]]) {
+      const result = await evaluate(`__uploadBackground(new File(["not a participant workbook"], ${JSON.stringify(name)}, {type:${JSON.stringify(type)}}), "excelFile")`);
+      assert.equal(result.error, true, `${name} must be rejected by the participant picker`);
+      assert.equal(result.name, "background.png");
+      assert.equal(result.image, true);
+      assert.equal(await evaluate('document.getElementById("feedbackModalMessage").textContent'), "참가자 엑셀(.xlsx) 파일만 선택해주세요.");
+      await evaluate('document.getElementById("feedbackModalButton").click()');
+    }
+    assert.deepEqual(await evaluate(`(async () => ({background:(await LuckyDrawBackground.get()).updatedAt, drawState:localStorage.getItem(LuckyDrawStore.STATE_KEY)}))()`), beforeRejectedFiles, "rejected participant files must preserve the background and draw data");
+    for (const [bytes, name, type] of [[mov, "recording.mov", "video/quicktime"], [webm, "background.webm", "video/webm"], [mp4, "background.mp4", ""]]) {
+      const result = await evaluate(`__uploadBackground(${fileScript(bytes, name, type)})`);
       assert.equal(result.name, name);
       assert.equal(result.video, true, `${name} must autoplay silently in the preview`);
       assert.equal(result.error, false);
       assert.equal(result.type, type || "video/mp4");
     }
-    assert.equal(await evaluate('selectedExcelFile?.name === "luckydraw_sample.xlsx" && document.getElementById("fileMessage").textContent.includes("background.mp4")'), true, "uploading a background through the main picker must preserve the participant Excel file");
+    assert.equal(await evaluate('selectedExcelFile?.name === "luckydraw_sample.xlsx" && document.getElementById("fileMessage").textContent.includes("luckydraw_sample.xlsx")'), true, "rejected files and separate background uploads must preserve the participant Excel file");
     for (const [name, type] of [["broken.mp4", "video/mp4"], ["unsupported.txt", "text/plain"]]) {
       const result = await evaluate(`__uploadBackground(new File(["invalid media"], ${JSON.stringify(name)}, {type:${JSON.stringify(type)}}))`);
       assert.equal(result.error, true);
@@ -271,7 +282,7 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
         assert.equal(readFileSync(marker, "utf8"), "preserve existing file");
         assert.deepEqual(downloads, []);
         clearTimeout(timeout);
-        process.stdout.write("SELF_TEST_OK: image/MP4/WebM/MOV uploads through both pickers, participant file preservation, muted autoplay and looping, invalid-file recovery, background replacement/deletion, 100-person Excel upload, number keys and Enter, repeat draws, responsive layouts, reload recovery, and no winner files or permission requests\n");
+        process.stdout.write("SELF_TEST_OK: Excel-only participant picker, separate image/MP4/WebM/MOV background uploads, participant file preservation, muted autoplay and looping, invalid-file recovery, background replacement/deletion, 100-person Excel upload, number keys and Enter, repeat draws, responsive layouts including LCD bottom gap 515px, reload recovery, and no winner files or permission requests\n");
       } catch (error) {
         event.preventDefault();
         process.stdout.write(`SELF_TEST_FAILED: ${error.message}\n`);
