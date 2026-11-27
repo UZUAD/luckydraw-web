@@ -7,6 +7,7 @@
   <script src="vendor/confetti.browser.min.js"></script>
   <script src="vendor/background-store.js"></script>
   <script src="vendor/draw-store.js"></script>
+  <script src="vendor/screen-settings.js"></script>
   <style>
     :root {
       --stage-scale: 1;
@@ -21,6 +22,7 @@
     html, body { margin: 0; width: 100%; height: 100%; }
     body { overflow: hidden; color: #fff; background: #000; }
     .stage { position: fixed; inset: 0; z-index: 1; overflow: hidden; background: #000 center / cover no-repeat; }
+    .stage.has-screen-size { inset: auto; left: 50%; top: 50%; width: var(--screen-width); height: var(--screen-height); transform: translate(-50%, -50%) scale(var(--screen-scale)); transform-origin: center; }
     .background-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
     .winner-grid {
       position: absolute;
@@ -130,7 +132,14 @@
 
     function updateStageScale() {
       const count = Number(grid.dataset.count) || drawCount;
-      const contentBottom = innerHeight;
+      const size = LuckyDrawScreen.load(localStorage);
+      const screenWidth = size?.width ?? innerWidth;
+      const screenHeight = size?.height ?? innerHeight;
+      stage.classList.toggle("has-screen-size", Boolean(size));
+      stage.style.setProperty("--screen-width", `${screenWidth}px`);
+      stage.style.setProperty("--screen-height", `${screenHeight}px`);
+      stage.style.setProperty("--screen-scale", String(Math.min(innerWidth / screenWidth, innerHeight / screenHeight)));
+      const contentBottom = screenHeight;
       const styles = getComputedStyle(stage);
       const digitGap = parseFloat(styles.getPropertyValue("--digit-gap"));
       const panelGap = parseFloat(styles.getPropertyValue("--horizontal-panel-gap"));
@@ -138,12 +147,12 @@
       const width = count * panelWidth + (count - 1) * panelGap;
       const height = 136;
       const scale = count === 1
-        ? Math.min(innerWidth / 2304, contentBottom / 640)
-        : Math.min(innerWidth * .86 / width, contentBottom * .44 / height);
+        ? Math.min(screenWidth / 2304, contentBottom / 640)
+        : Math.min(screenWidth * .86 / width, contentBottom * .44 / height);
       stage.style.setProperty("--stage-scale", String(scale));
       grid.style.setProperty("--columns", String(count));
       grid.style.setProperty("--panel-gap", `${panelGap}px`);
-      const preferredCenter = count === 1 ? innerHeight * .5 - 20 * scale : innerHeight * .56;
+      const preferredCenter = count === 1 ? screenHeight * .5 - 20 * scale : screenHeight * .56;
       const center = Math.max(height * scale / 2 + 8, Math.min(preferredCenter, contentBottom - height * scale / 2 - 16));
       grid.style.top = `${center}px`;
       grid.dataset.layout = drawLayout;
@@ -348,6 +357,7 @@
       startDraw();
     });
     window.addEventListener("storage", (event) => {
+      if (event.key === LuckyDrawScreen.STORAGE_KEY || event.key === null) updateStageScale();
       if (event.key !== LuckyDrawStore.STATE_KEY || isPlaying) return;
       try {
         state = store.load();

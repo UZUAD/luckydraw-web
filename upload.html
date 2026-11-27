@@ -8,6 +8,7 @@
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="vendor/background-store.js"></script>
   <script src="vendor/draw-store.js"></script>
+  <script src="vendor/screen-settings.js"></script>
 
   <style>
     :root {
@@ -332,7 +333,8 @@
       min-height: 22px;
     }
 
-    .file-badge {
+    .file-badge,
+    .field label.file-badge {
       position: relative;
       display: inline-flex;
       align-items: center;
@@ -340,6 +342,7 @@
       flex-shrink: 0;
       min-width: 112px;
       height: 42px;
+      margin: 0;
       padding: 0 18px;
       white-space: nowrap;
       border-radius: 14px;
@@ -432,6 +435,79 @@
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
+    }
+
+    .background-controls .select-input {
+      margin-left: auto;
+    }
+
+    .screen-size-label {
+      margin: 0 0 8px;
+      color: #263247;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .screen-size-fields {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+    }
+
+    .screen-size-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      color: #667186;
+      font-size: 13px;
+    }
+
+    .screen-size-field:focus-within {
+      border-color: rgba(31, 111, 255, 0.36);
+      box-shadow: 0 0 0 3px rgba(31, 111, 255, 0.09);
+    }
+
+    .screen-size-field input {
+      width: 100%;
+      min-width: 0;
+      height: 42px;
+      padding: 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text-main);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      appearance: textfield;
+    }
+
+    .screen-size-field input::-webkit-inner-spin-button,
+    .screen-size-field input::-webkit-outer-spin-button {
+      appearance: none;
+      margin: 0;
+    }
+
+    .screen-size-field span,
+    .screen-size-separator {
+      flex-shrink: 0;
+    }
+
+    .screen-size-separator {
+      color: #758095;
+    }
+
+    .screen-size-error {
+      margin: 8px 0 0;
+      color: #b42318;
+      font-size: 13px;
+      line-height: 1.5;
     }
 
     .secondary-btn,
@@ -702,6 +778,22 @@
         grid-template-columns: 1fr;
       }
 
+      .screen-size-field {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 8px;
+        padding: 8px 12px;
+      }
+
+      .screen-size-field span:first-child {
+        grid-column: 1 / -1;
+        font-size: 12px;
+      }
+
+      .screen-size-field input {
+        height: 24px;
+      }
+
       .modal {
         padding: 24px 20px 20px;
         border-radius: 24px;
@@ -826,6 +918,16 @@
 
           <section class="background-settings" aria-labelledby="backgroundSettingsTitle">
             <h3 class="background-settings-title" id="backgroundSettingsTitle">행사 배경 이미지 / 영상</h3>
+            <div class="screen-size-settings" role="group" aria-labelledby="screenSizeLabel" aria-describedby="screenSizeHint screenSizeError">
+              <p class="screen-size-label" id="screenSizeLabel">출력 화면 크기 (px)</p>
+              <div class="screen-size-fields">
+                <label class="screen-size-field" for="screenWidth"><span>가로</span><input id="screenWidth" type="number" min="320" max="16384" step="1" inputmode="numeric" placeholder="예: 2816" aria-describedby="screenSizeHint screenSizeError" /><span>px</span></label>
+                <span class="screen-size-separator" aria-hidden="true">×</span>
+                <label class="screen-size-field" for="screenHeight"><span>세로</span><input id="screenHeight" type="number" min="180" max="16384" step="1" inputmode="numeric" placeholder="예: 896" aria-describedby="screenSizeHint screenSizeError" /><span>px</span></label>
+              </div>
+              <div class="field-hint" id="screenSizeHint">LED 2816×896 · LCD 5000×1200. 입력한 비율로 배경과 번호판을 맞춥니다. 두 칸을 비우면 현재 화면에 자동으로 맞춥니다.</div>
+              <p class="screen-size-error" id="screenSizeError" role="alert" hidden></p>
+            </div>
             <div class="background-preview" id="backgroundPreview">
               <video id="backgroundPreviewVideo" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-hidden="true" tabindex="-1" hidden></video>
               <span id="backgroundPreviewEmpty">배경을 등록하지 않으면 검은 화면으로 표시됩니다.</span>
@@ -833,11 +935,11 @@
             <div class="background-controls">
               <label class="file-badge" for="backgroundFile"><span>이미지 / 영상 선택</span></label>
               <input class="hidden-file" type="file" id="backgroundFile" accept="image/png,image/jpeg,image/webp,video/*,.png,.jpg,.jpeg,.webp,.mp4,.webm,.mov,.m4v" />
+              <button class="secondary-btn" id="removeBackgroundButton" type="button" disabled>배경 삭제</button>
               <select class="select-input" id="backgroundFit" aria-label="배경 표시 방식">
                 <option value="cover">화면 채우기</option>
                 <option value="contain">전체 배경 보기</option>
               </select>
-              <button class="secondary-btn" id="removeBackgroundButton" type="button" disabled>배경 삭제</button>
             </div>
             <div class="background-message" id="backgroundMessage">PNG, JPG, WebP 이미지와 이 브라우저에서 재생 가능한 영상을 사용할 수 있습니다. 영상은 무음으로 자동 반복 재생됩니다.</div>
           </section>
@@ -891,6 +993,9 @@
     const rangeQuickGuide = document.getElementById("rangeQuickGuide");
     const backgroundFileInput = document.getElementById("backgroundFile");
     const backgroundFitSelect = document.getElementById("backgroundFit");
+    const screenWidthInput = document.getElementById("screenWidth");
+    const screenHeightInput = document.getElementById("screenHeight");
+    const screenSizeError = document.getElementById("screenSizeError");
     const backgroundPreview = document.getElementById("backgroundPreview");
     const backgroundPreviewVideo = document.getElementById("backgroundPreviewVideo");
     const backgroundPreviewEmpty = document.getElementById("backgroundPreviewEmpty");
@@ -973,6 +1078,10 @@
     }
 
     async function loadBackgroundSettings() {
+      const size = LuckyDrawScreen.load(localStorage);
+      screenWidthInput.value = size?.width ?? "";
+      screenHeightInput.value = size?.height ?? "";
+      backgroundPreview.style.aspectRatio = size ? `${size.width} / ${size.height}` : "16 / 5";
       const fit = localStorage.getItem("luckydraw_background_fit") || "cover";
       backgroundFitSelect.value = fit === "contain" ? "contain" : "cover";
       backgroundPreview.style.backgroundSize = backgroundFitSelect.value;
@@ -984,6 +1093,35 @@
         backgroundMessage.textContent = "저장된 배경을 불러오지 못했습니다.";
       }
     }
+
+    function saveScreenSettings() {
+      let size;
+      try {
+        // A number input exposes an empty value while its text is invalid (for example "1e").
+        if (screenWidthInput.validity.badInput || screenHeightInput.validity.badInput) throw new Error("화면 크기는 가로·세로 모두 숫자로 입력해주세요.");
+        size = LuckyDrawScreen.parse(screenWidthInput.value, screenHeightInput.value);
+      } catch (error) {
+        screenSizeError.textContent = error.message;
+        screenSizeError.hidden = false;
+        screenWidthInput.setAttribute("aria-invalid", "true");
+        screenHeightInput.setAttribute("aria-invalid", "true");
+        return false;
+      }
+      try {
+        LuckyDrawScreen.save(localStorage, size);
+      } catch {
+        screenSizeError.textContent = "화면 크기를 저장하지 못했습니다. 저장 공간을 확인한 뒤 다시 시도해주세요.";
+        screenSizeError.hidden = false;
+        return false;
+      }
+      screenSizeError.hidden = true;
+      screenWidthInput.removeAttribute("aria-invalid");
+      screenHeightInput.removeAttribute("aria-invalid");
+      backgroundPreview.style.aspectRatio = size ? `${size.width} / ${size.height}` : "16 / 5";
+      return true;
+    }
+    screenWidthInput.addEventListener("change", saveScreenSettings);
+    screenHeightInput.addEventListener("change", saveScreenSettings);
 
     backgroundFitSelect.addEventListener("change", () => {
       localStorage.setItem("luckydraw_background_fit", backgroundFitSelect.value);
@@ -1195,6 +1333,7 @@
 
     function saveNumbersAndContinue(numbers) {
       if (eventStarting || !eventReady) return;
+      if (!saveScreenSettings()) { screenWidthInput.focus(); return; }
       try {
         numbers = LuckyDrawStore.normalizeNumbers(numbers);
         LuckyDrawStore.create(localStorage).register(numbers);
@@ -1235,6 +1374,7 @@
 
     submitButton.addEventListener("click", () => {
       if (backgroundSaving || eventStarting || !eventReady) return;
+      if (!saveScreenSettings()) { screenWidthInput.focus(); return; }
       if (activeMode === "range") {
         registerNumberRange();
         return;

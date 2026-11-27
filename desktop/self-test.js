@@ -153,7 +153,7 @@ module.exports = async function runSelfTest({ window, app, session, saveBundledF
     })()`), true);
     assert.equal(await evaluate('fetch("/_save-winners", {method:"POST", body:"test"}).then(response => response.status)'), 404);
 
-    for (const [width, height] of [[1280, 720], [2304, 640], [1920, 1080], [3440, 1440], [3840, 2160], [5120, 1440], [1080, 1920]]) {
+    for (const [width, height] of [[1280, 720], [2304, 640], [1920, 1080], [2816, 896], [5000, 1200], [3440, 1440], [3840, 2160], [5120, 1440], [1080, 1920]]) {
       window.setContentSize(width, height);
       const result = await evaluate(`(() => {
         const failures = [];
