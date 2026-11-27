@@ -457,7 +457,7 @@
 
     .screen-size-field {
       display: flex;
-      align-items: center;
+      align-items: baseline;
       gap: 8px;
       min-width: 0;
       padding: 0 12px;
@@ -466,6 +466,7 @@
       background: #fff;
       color: #667186;
       font-size: 13px;
+      line-height: 20px;
     }
 
     .screen-size-field:focus-within {
@@ -483,7 +484,6 @@
       background: transparent;
       color: var(--text-main);
       font: inherit;
-      font-size: 14px;
       font-weight: 700;
       appearance: textfield;
     }
@@ -779,19 +779,12 @@
       }
 
       .screen-size-field {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 4px 8px;
-        padding: 8px 12px;
+        gap: 6px;
+        padding: 0 10px;
       }
 
-      .screen-size-field span:first-child {
-        grid-column: 1 / -1;
-        font-size: 12px;
-      }
-
-      .screen-size-field input {
-        height: 24px;
+      .screen-size-field span:last-child {
+        display: none;
       }
 
       .modal {
@@ -918,14 +911,13 @@
 
           <section class="background-settings" aria-labelledby="backgroundSettingsTitle">
             <h3 class="background-settings-title" id="backgroundSettingsTitle">행사 배경 이미지 / 영상</h3>
-            <div class="screen-size-settings" role="group" aria-labelledby="screenSizeLabel" aria-describedby="screenSizeHint screenSizeError">
+            <div class="screen-size-settings" role="group" aria-labelledby="screenSizeLabel" aria-describedby="screenSizeError">
               <p class="screen-size-label" id="screenSizeLabel">출력 화면 크기 (px)</p>
               <div class="screen-size-fields">
-                <label class="screen-size-field" for="screenWidth"><span>가로</span><input id="screenWidth" type="number" min="320" max="16384" step="1" inputmode="numeric" placeholder="예: 2816" aria-describedby="screenSizeHint screenSizeError" /><span>px</span></label>
+                <label class="screen-size-field" for="screenWidth"><span>가로</span><input id="screenWidth" type="number" min="320" max="16384" step="1" inputmode="numeric" aria-describedby="screenSizeError" /><span>px</span></label>
                 <span class="screen-size-separator" aria-hidden="true">×</span>
-                <label class="screen-size-field" for="screenHeight"><span>세로</span><input id="screenHeight" type="number" min="180" max="16384" step="1" inputmode="numeric" placeholder="예: 896" aria-describedby="screenSizeHint screenSizeError" /><span>px</span></label>
+                <label class="screen-size-field" for="screenHeight"><span>세로</span><input id="screenHeight" type="number" min="180" max="16384" step="1" inputmode="numeric" aria-describedby="screenSizeError" /><span>px</span></label>
               </div>
-              <div class="field-hint" id="screenSizeHint">LED 2816×896 · LCD 5000×1200. 입력한 비율로 배경과 번호판을 맞춥니다. 두 칸을 비우면 현재 화면에 자동으로 맞춥니다.</div>
               <p class="screen-size-error" id="screenSizeError" role="alert" hidden></p>
             </div>
             <div class="background-preview" id="backgroundPreview">
@@ -941,7 +933,7 @@
                 <option value="contain">전체 배경 보기</option>
               </select>
             </div>
-            <div class="background-message" id="backgroundMessage">PNG, JPG, WebP 이미지와 이 브라우저에서 재생 가능한 영상을 사용할 수 있습니다. 영상은 무음으로 자동 반복 재생됩니다.</div>
+            <div class="background-message" id="backgroundMessage" role="status" hidden></div>
           </section>
 
           <div class="quick-guide" id="excelQuickGuide">
@@ -1034,9 +1026,9 @@
         window.luckyDrawBackgroundSettingsReady = loadBackgroundSettings();
       }
     });
-    function formatFileSize(bytes) {
-      if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
-      return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    function showBackgroundMessage(message = "") {
+      backgroundMessage.textContent = message;
+      backgroundMessage.hidden = !message;
     }
 
     function clearBackgroundPreview() {
@@ -1051,10 +1043,10 @@
 
     function setBackgroundPreview(record) {
       clearBackgroundPreview();
+      showBackgroundMessage();
 
       if (!record || !record.blob) {
         backgroundPreviewEmpty.hidden = false;
-        backgroundMessage.textContent = "PNG, JPG, WebP 이미지와 이 브라우저에서 재생 가능한 영상을 사용할 수 있습니다. 영상은 무음으로 자동 반복 재생됩니다.";
         removeBackgroundButton.disabled = true;
         return;
       }
@@ -1067,13 +1059,12 @@
         backgroundPreviewVideo.hidden = false;
         const url = backgroundPreviewUrl;
         backgroundPreviewVideo.play().catch(() => {
-          if (backgroundPreviewUrl === url) backgroundMessage.textContent = "영상 미리보기를 재생하지 못했습니다. 다른 영상을 선택해주세요.";
+          if (backgroundPreviewUrl === url) showBackgroundMessage("영상 미리보기를 재생하지 못했습니다. 다른 영상을 선택해주세요.");
         });
       } else {
         backgroundPreview.style.backgroundImage = `url(${JSON.stringify(backgroundPreviewUrl)})`;
       }
       backgroundPreviewEmpty.hidden = true;
-      backgroundMessage.textContent = `${record.name} · ${formatFileSize(record.size)}${isVideo ? " · 무음 반복 재생" : ""}`;
       removeBackgroundButton.disabled = false;
     }
 
@@ -1090,7 +1081,7 @@
       try {
         setBackgroundPreview(await LuckyDrawBackground.get());
       } catch {
-        backgroundMessage.textContent = "저장된 배경을 불러오지 못했습니다.";
+        showBackgroundMessage("저장된 배경을 불러오지 못했습니다.");
       }
     }
 
@@ -1145,12 +1136,12 @@
       submitButton.disabled = true;
       try {
         await window.luckyDrawBackgroundSettingsReady;
-        backgroundMessage.textContent = "배경 파일을 확인하고 저장하고 있습니다…";
+        showBackgroundMessage("배경 파일을 확인하고 저장하고 있습니다…");
         await LuckyDrawBackground.save(file);
         setBackgroundPreview(await LuckyDrawBackground.get());
         return true;
       } catch (error) {
-        backgroundMessage.textContent = previousMessage;
+        showBackgroundMessage(previousMessage);
         removeBackgroundButton.disabled = wasRemoveDisabled;
         showFeedbackModal(error.name === "NotSupportedError" ? error.message : "배경을 저장하지 못했습니다. 저장 공간을 확인하거나 더 작은 파일을 선택해주세요.");
         return false;
